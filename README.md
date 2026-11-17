@@ -4,7 +4,7 @@ A double-entry ledger and payments API for wallet-based fintech products. It cov
 
 **Stack:** Node.js 22, TypeScript (strict), Fastify 5, PostgreSQL 16, OpenAPI 3.1 / Swagger UI, Vitest, Docker, GitHub Actions.
 
-**Live Swagger docs:** https://mighty-odewumi.github.io/kosta/ (OpenAPI 3.1, regenerated from the code on every push). The running server also serves Swagger UI at `/docs`.
+**Live Swagger docs:** https://mighty-odewumi.github.io/kosta/ (OpenAPI 3.1, regenerated from the code on every push). Try it out sends real requests to the public sandbox at https://kosta-api.onrender.com, which also serves its own Swagger UI at [`/docs`](https://kosta-api.onrender.com/docs). The free instance sleeps when idle, so the first request can take around 30 seconds.
 
 ---
 

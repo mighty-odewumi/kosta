@@ -28,11 +28,11 @@ jobs:
           cache: npm
       - run: npm ci
       # Regenerate the spec from the code so the docs can never drift from the API.
-      # Set the repository variable PUBLIC_API_URL to your deployed API to make Try it out hit it live.
+      # Try it out targets the public sandbox. Override with the repository variable PUBLIC_API_URL.
       - run: npm run docs:export
         env:
-          SANDBOX_MODE: ${{ vars.PUBLIC_API_URL != '' && 'true' || 'false' }}
-          PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
+          SANDBOX_MODE: 'true'
+          PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL || 'https://kosta-api.onrender.com' }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
