@@ -1,0 +1,2909 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Kosta API",
+    "version": "1.0.0",
+    "description": "Kosta is a double-entry ledger and payments API for wallet-based fintech products.\n\n**Core guarantees**\n\n- **Double-entry accounting.** Every movement of money is a journal entry whose postings sum to zero. A deferred Postgres trigger rejects any unbalanced entry at commit time.\n- **No overdrafts.** Accounts are row-locked in a fixed order during each entry, and a database CHECK constraint stops customer balances going below zero even if application code is wrong.\n- **Exactly-once money movement.** Transfers and withdrawals require an `Idempotency-Key`. Retries replay the original response.\n- **Append-only ledger.** Postings and journal entries cannot be updated or deleted; corrections are new entries.\n- **Integer money.** All amounts are integers in minor units (kobo, cents). No floating point anywhere.\n- **Signed, replay-safe webhooks** for deposits, de-duplicated by event id and provider reference.\n- **Full audit trail** written in the same transaction as each change, plus an on-demand reconciliation report.\n\n**Authentication**\n\nSend `Authorization: Bearer <api key>`. Client keys see only the wallets they created. Admin keys can review payouts, freeze accounts, read the audit log and run reconciliation.\n\n**Errors**\n\nEvery error has the shape `{ \"error\": { \"code\": \"...\", \"message\": \"...\", \"details\": {} } }`. Branch on `code`."
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "API key, e.g. ks_live_xxx or ks_admin_xxx"
+      },
+      "webhookSignature": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Kosta-Signature",
+        "description": "t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\">"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "examples": [
+                  "insufficient_funds"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "type": "object",
+                "additionalProperties": {}
+              }
+            }
+          }
+        },
+        "description": "Every error uses this shape. Branch on error.code, not the message."
+      },
+      "Account": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "currency",
+          "status",
+          "balance",
+          "version",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "NGN"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "USD"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "GBP"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "EUR"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "KES"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "GHS"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "ZAR"
+                ]
+              }
+            ],
+            "description": "ISO 4217 currency code."
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "active"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "frozen"
+                ]
+              }
+            ]
+          },
+          "balance": {
+            "type": "integer",
+            "description": "Current balance in minor units."
+          },
+          "version": {
+            "type": "integer",
+            "description": "Increments on every balance change. Useful for optimistic UI."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Posting": {
+        "type": "object",
+        "required": [
+          "id",
+          "entry_id",
+          "kind",
+          "amount",
+          "balance_after",
+          "description",
+          "reference_type",
+          "reference_id",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "entry_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "examples": [
+              "transfer"
+            ]
+          },
+          "amount": {
+            "type": "integer",
+            "description": "Signed. Positive is a credit, negative is a debit."
+          },
+          "balance_after": {
+            "type": "integer"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reference_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reference_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Transfer": {
+        "type": "object",
+        "required": [
+          "id",
+          "from_account_id",
+          "to_account_id",
+          "amount",
+          "currency",
+          "status",
+          "narration",
+          "entry_id",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "from_account_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "to_account_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "integer"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "NGN"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "USD"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "GBP"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "EUR"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "KES"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "GHS"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "ZAR"
+                ]
+              }
+            ],
+            "description": "ISO 4217 currency code."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed"
+            ]
+          },
+          "narration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "entry_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Withdrawal": {
+        "type": "object",
+        "required": [
+          "id",
+          "account_id",
+          "amount",
+          "fee",
+          "currency",
+          "status",
+          "destination",
+          "review_note",
+          "reviewed_at",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "account_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "integer",
+            "description": "Amount paid out to the destination."
+          },
+          "fee": {
+            "type": "integer",
+            "description": "Platform fee, charged on top of amount."
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "NGN"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "USD"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "GBP"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "EUR"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "KES"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "GHS"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "ZAR"
+                ]
+              }
+            ],
+            "description": "ISO 4217 currency code."
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pending"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "completed"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "rejected"
+                ]
+              }
+            ]
+          },
+          "destination": {
+            "type": "object",
+            "required": [
+              "bank_code",
+              "account_number",
+              "account_name"
+            ],
+            "properties": {
+              "bank_code": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 11,
+                "examples": [
+                  "058"
+                ]
+              },
+              "account_number": {
+                "type": "string",
+                "pattern": "^[0-9]{6,20}$",
+                "examples": [
+                  "0123456789"
+                ]
+              },
+              "account_name": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 120,
+                "examples": [
+                  "Ada Okafor"
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "review_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Liveness and database check",
+        "tags": [
+          "System"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "status",
+                    "database"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok"
+                      ]
+                    },
+                    "database": {
+                      "type": "string",
+                      "enum": [
+                        "ok"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/accounts": {
+      "post": {
+        "summary": "Open a wallet account",
+        "tags": [
+          "Accounts"
+        ],
+        "description": "Creates a single-currency customer wallet owned by the calling API key. Starts at a zero balance.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "currency"
+                ],
+                "properties": {
+                  "currency": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "NGN"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "USD"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "GBP"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "EUR"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "KES"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "GHS"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "ZAR"
+                        ]
+                      }
+                    ],
+                    "description": "ISO 4217 currency code."
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "examples": [
+                      "Ada main wallet"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed or a required header (such as Idempotency-Key) is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key does not have permission for this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist or belongs to another client.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource is in the wrong state, or the same Idempotency-Key is still in flight.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule rejected the request: insufficient_funds, currency_mismatch, idempotency_key_reused and similar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "The account is frozen and cannot be debited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List your accounts",
+        "tags": [
+          "Accounts"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "in": "query",
+            "name": "cursor",
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "next_cursor"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Account"
+                      }
+                    },
+                    "next_cursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Pass as ?cursor= to fetch the next page. null when there are no more results."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed or a required header (such as Idempotency-Key) is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key does not have permission for this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist or belongs to another client.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource is in the wrong state, or the same Idempotency-Key is still in flight.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule rejected the request: insufficient_funds, currency_mismatch, idempotency_key_reused and similar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "The account is frozen and cannot be debited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/accounts/{id}": {
+      "get": {
+        "summary": "Get an account and its balance",
+        "tags": [
+          "Accounts"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed or a required header (such as Idempotency-Key) is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key does not have permission for this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist or belongs to another client.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource is in the wrong state, or the same Idempotency-Key is still in flight.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule rejected the request: insufficient_funds, currency_mismatch, idempotency_key_reused and similar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "The account is frozen and cannot be debited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/accounts/{id}/transactions": {
+      "get": {
+        "summary": "Account statement",
+        "tags": [
+          "Accounts"
+        ],
+        "description": "Every ledger posting that touched this account, newest first, with the running balance after each one. Cursor-paginated so it stays fast on large accounts.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "in": "query",
+            "name": "cursor",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "next_cursor"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Posting"
+                      }
+                    },
+                    "next_cursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Pass as ?cursor= to fetch the next page. null when there are no more results."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed or a required header (such as Idempotency-Key) is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key does not have permission for this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist or belongs to another client.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource is in the wrong state, or the same Idempotency-Key is still in flight.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule rejected the request: insufficient_funds, currency_mismatch, idempotency_key_reused and similar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "The account is frozen and cannot be debited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/transfers": {
+      "post": {
+        "summary": "Move money between two wallets",
+        "tags": [
+          "Transfers"
+        ],
+        "description": "Atomically debits the source wallet and credits the destination wallet in one balanced journal entry. The source must belong to the caller; the destination can be any customer wallet in the same currency. Requires an Idempotency-Key header: retries return the original result and never move money twice.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "from_account_id",
+                  "to_account_id",
+                  "amount"
+                ],
+                "properties": {
+                  "from_account_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "to_account_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "amount": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000000000000,
+                    "description": "Amount in minor units (kobo, cents, pence). 150000 NGN = NGN 1,500.00. Never a float.",
+                    "examples": [
+                      150000
+                    ]
+                  },
+                  "narration": {
+                    "type": "string",
+                    "maxLength": 140,
+                    "examples": [
+                      "Rent share for March"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 255
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true,
+            "description": "Unique key per logical operation (a UUID works). Retrying with the same key and body returns the original response instead of moving money twice."
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transfer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed or a required header (such as Idempotency-Key) is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key does not have permission for this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist or belongs to another client.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource is in the wrong state, or the same Idempotency-Key is still in flight.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule rejected the request: insufficient_funds, currency_mismatch, idempotency_key_reused and similar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "The account is frozen and cannot be debited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/transfers/{id}": {
+      "get": {
+        "summary": "Get a transfer",
+        "tags": [
+          "Transfers"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transfer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed or a required header (such as Idempotency-Key) is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key does not have permission for this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist or belongs to another client.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource is in the wrong state, or the same Idempotency-Key is still in flight.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule rejected the request: insufficient_funds, currency_mismatch, idempotency_key_reused and similar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "The account is frozen and cannot be debited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/withdrawals": {
+      "post": {
+        "summary": "Request a payout to a bank account",
+        "tags": [
+          "Withdrawals"
+        ],
+        "description": "Places a hold on amount + fee by moving it from the wallet into the withdrawals_pending system account, so the funds cannot be spent twice while the payout is reviewed. An admin then approves (funds leave the platform) or rejects (hold is released back to the wallet). Requires an Idempotency-Key header.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "account_id",
+                  "amount",
+                  "destination"
+                ],
+                "properties": {
+                  "account_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "amount": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000000000000,
+                    "description": "Amount in minor units (kobo, cents, pence). 150000 NGN = NGN 1,500.00. Never a float.",
+                    "examples": [
+                      150000
+                    ]
+                  },
+                  "destination": {
+                    "type": "object",
+                    "required": [
+                      "bank_code",
+                      "account_number",
+                      "account_name"
+                    ],
+                    "properties": {
+                      "bank_code": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 11,
+                        "examples": [
+                          "058"
+                        ]
+                      },
+                      "account_number": {
+                        "type": "string",
+                        "pattern": "^[0-9]{6,20}$",
+                        "examples": [
+                          "0123456789"
+                        ]
+                      },
+                      "account_name": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 120,
+                        "examples": [
+                          "Ada Okafor"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 255
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true,
+            "description": "Unique key per logical operation (a UUID works). Retrying with the same key and body returns the original response instead of moving money twice."
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Withdrawal"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed or a required header (such as Idempotency-Key) is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key does not have permission for this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist or belongs to another client.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource is in the wrong state, or the same Idempotency-Key is still in flight.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule rejected the request: insufficient_funds, currency_mismatch, idempotency_key_reused and similar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "The account is frozen and cannot be debited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/withdrawals/{id}": {
+      "get": {
+        "summary": "Get a withdrawal",
+        "tags": [
+          "Withdrawals"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Withdrawal"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed or a required header (such as Idempotency-Key) is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key does not have permission for this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist or belongs to another client.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource is in the wrong state, or the same Idempotency-Key is still in flight.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule rejected the request: insufficient_funds, currency_mismatch, idempotency_key_reused and similar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "The account is frozen and cannot be debited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/withdrawals": {
+      "get": {
+        "summary": "Withdrawal review queue",
+        "tags": [
+          "Admin"
+        ],
+        "description": "Oldest first, so payouts are reviewed in the order they were requested.",
+        "parameters": [
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "pending"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "completed"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "rejected"
+                  ]
+                }
+              ],
+              "default": "pending"
+            },
+            "in": "query",
+            "name": "status",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Withdrawal"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed or a required header (such as Idempotency-Key) is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key does not have permission for this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist or belongs to another client.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource is in the wrong state, or the same Idempotency-Key is still in flight.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule rejected the request: insufficient_funds, currency_mismatch, idempotency_key_reused and similar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "The account is frozen and cannot be debited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/withdrawals/{id}/approve": {
+      "post": {
+        "summary": "Approve and settle a payout",
+        "tags": [
+          "Admin"
+        ],
+        "description": "Settles the hold: amount goes to the settlement account (money leaves the platform) and the fee is recognised as revenue. Only pending withdrawals can be approved; the row is locked so two admins cannot settle the same payout.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "note": {
+                    "type": "string",
+                    "maxLength": 280,
+                    "examples": [
+                      "Verified against KYC record"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Withdrawal"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed or a required header (such as Idempotency-Key) is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key does not have permission for this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist or belongs to another client.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource is in the wrong state, or the same Idempotency-Key is still in flight.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule rejected the request: insufficient_funds, currency_mismatch, idempotency_key_reused and similar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "The account is frozen and cannot be debited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/withdrawals/{id}/reject": {
+      "post": {
+        "summary": "Reject a payout and release the hold",
+        "tags": [
+          "Admin"
+        ],
+        "description": "Returns amount + fee from withdrawals_pending to the customer wallet. Only pending withdrawals can be rejected.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "note": {
+                    "type": "string",
+                    "maxLength": 280,
+                    "examples": [
+                      "Verified against KYC record"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Withdrawal"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed or a required header (such as Idempotency-Key) is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key does not have permission for this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist or belongs to another client.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource is in the wrong state, or the same Idempotency-Key is still in flight.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule rejected the request: insufficient_funds, currency_mismatch, idempotency_key_reused and similar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "The account is frozen and cannot be debited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhooks/deposits": {
+      "post": {
+        "summary": "Receive a deposit notification from a payment provider",
+        "tags": [
+          "Webhooks"
+        ],
+        "description": "Credits a wallet when the provider confirms a payment. Security and safety:\n\n- HMAC-SHA256 signature in `X-Kosta-Signature: t=<unix>,v1=<hex>` computed over `<t>.<raw body>`\n- Requests older than 5 minutes are rejected (replay protection)\n- Each event id and each provider reference can only ever credit once, so provider retries are harmless\n- Always answers 200 for well-formed signed events so the provider stops retrying; failures are recorded for ops review",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "type",
+                  "provider",
+                  "data"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "description": "Provider event id. Used for de-duplication.",
+                    "examples": [
+                      "evt_8f2a1c"
+                    ]
+                  },
+                  "type": {
+                    "type": "string",
+                    "examples": [
+                      "deposit.succeeded"
+                    ]
+                  },
+                  "provider": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 40,
+                    "examples": [
+                      "paystack"
+                    ]
+                  },
+                  "data": {
+                    "type": "object",
+                    "required": [
+                      "account_id",
+                      "amount",
+                      "currency",
+                      "reference"
+                    ],
+                    "properties": {
+                      "account_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "amount": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10000000000000,
+                        "description": "Amount in minor units (kobo, cents, pence). 150000 NGN = NGN 1,500.00. Never a float.",
+                        "examples": [
+                          150000
+                        ]
+                      },
+                      "currency": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "NGN"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "USD"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "GBP"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "EUR"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "KES"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "GHS"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "ZAR"
+                            ]
+                          }
+                        ],
+                        "description": "ISO 4217 currency code."
+                      },
+                      "reference": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "description": "Provider transaction reference.",
+                        "examples": [
+                          "PSK_REF_0001"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "webhookSignature": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "status"
+                  ],
+                  "properties": {
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "processed"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "duplicate"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "ignored"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "failed"
+                          ]
+                        }
+                      ]
+                    },
+                    "deposit_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Every error uses this shape. Branch on error.code, not the message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Every error uses this shape. Branch on error.code, not the message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/reconciliation": {
+      "get": {
+        "summary": "Run a ledger reconciliation",
+        "tags": [
+          "Admin"
+        ],
+        "description": "Proves the books are correct. Checks that (1) postings in every currency sum to exactly zero, (2) every cached account balance equals the sum of its postings, and (3) no journal entry is unbalanced. Also returns system account positions: settlement (money that should be at the bank), funds held for pending payouts, and fee revenue. Safe to run on a schedule and alert on ok = false.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "checked_at",
+                    "currencies",
+                    "mismatched_accounts",
+                    "unbalanced_entries"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "checked_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "currencies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "currency",
+                          "postings_total",
+                          "customer_liabilities",
+                          "settlement",
+                          "withdrawals_pending",
+                          "fee_revenue"
+                        ],
+                        "properties": {
+                          "currency": {
+                            "type": "string"
+                          },
+                          "postings_total": {
+                            "type": "integer",
+                            "description": "Must be 0."
+                          },
+                          "customer_liabilities": {
+                            "type": "integer",
+                            "description": "Total owed to customers."
+                          },
+                          "settlement": {
+                            "type": "integer"
+                          },
+                          "withdrawals_pending": {
+                            "type": "integer"
+                          },
+                          "fee_revenue": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    },
+                    "mismatched_accounts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "account_id",
+                          "cached_balance",
+                          "ledger_balance"
+                        ],
+                        "properties": {
+                          "account_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "cached_balance": {
+                            "type": "integer"
+                          },
+                          "ledger_balance": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    },
+                    "unbalanced_entries": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "uuid"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed or a required header (such as Idempotency-Key) is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key does not have permission for this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist or belongs to another client.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource is in the wrong state, or the same Idempotency-Key is still in flight.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule rejected the request: insufficient_funds, currency_mismatch, idempotency_key_reused and similar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "The account is frozen and cannot be debited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/audit-log": {
+      "get": {
+        "summary": "Audit trail",
+        "tags": [
+          "Admin"
+        ],
+        "description": "Who did what, when. Every state change (accounts, transfers, payouts, deposits, freezes) writes here in the same transaction as the change.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "in": "query",
+            "name": "cursor",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "query",
+            "name": "target_id",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "example": "transfer.completed",
+            "in": "query",
+            "name": "action",
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "next_cursor"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "actor",
+                          "action",
+                          "target_type",
+                          "target_id",
+                          "data",
+                          "created_at"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "actor": {
+                            "type": "string"
+                          },
+                          "action": {
+                            "type": "string"
+                          },
+                          "target_type": {
+                            "type": "string"
+                          },
+                          "target_id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "data": {
+                            "type": "object",
+                            "additionalProperties": {}
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    },
+                    "next_cursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed or a required header (such as Idempotency-Key) is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key does not have permission for this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist or belongs to another client.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource is in the wrong state, or the same Idempotency-Key is still in flight.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule rejected the request: insufficient_funds, currency_mismatch, idempotency_key_reused and similar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "The account is frozen and cannot be debited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/accounts/{id}/freeze": {
+      "post": {
+        "summary": "Freeze an account (compliance hold)",
+        "tags": [
+          "Admin"
+        ],
+        "description": "A frozen account can still receive money but cannot send transfers or request payouts.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 280,
+                    "examples": [
+                      "Suspicious activity review"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed or a required header (such as Idempotency-Key) is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key does not have permission for this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist or belongs to another client.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource is in the wrong state, or the same Idempotency-Key is still in flight.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule rejected the request: insufficient_funds, currency_mismatch, idempotency_key_reused and similar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "The account is frozen and cannot be debited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/accounts/{id}/unfreeze": {
+      "post": {
+        "summary": "Unfreeze an account",
+        "tags": [
+          "Admin"
+        ],
+        "description": "Restores normal debits on a frozen account.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 280,
+                    "examples": [
+                      "Suspicious activity review"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed or a required header (such as Idempotency-Key) is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key does not have permission for this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist or belongs to another client.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: the resource is in the wrong state, or the same Idempotency-Key is still in flight.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule rejected the request: insufficient_funds, currency_mismatch, idempotency_key_reused and similar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "The account is frozen and cannot be debited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Accounts",
+      "description": "Single-currency wallets and statements"
+    },
+    {
+      "name": "Transfers",
+      "description": "Wallet-to-wallet transfers"
+    },
+    {
+      "name": "Withdrawals",
+      "description": "Payouts to bank accounts with a hold, then review"
+    },
+    {
+      "name": "Webhooks",
+      "description": "Inbound payment provider events"
+    },
+    {
+      "name": "Admin",
+      "description": "Operations, compliance and finance tooling"
+    },
+    {
+      "name": "System",
+      "description": "Health"
+    }
+  ]
+}

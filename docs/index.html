@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kosta API | Swagger UI</title>
+<meta name="description" content="Interactive Swagger docs for Kosta, a double-entry ledger and payments API for fintech products.">
+<link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.35.0/swagger-ui.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  body { margin: 0; background: #fafafa; }
+  .hero { background: #0f172a; color: #e2e8f0; padding: 28px 20px 24px; font-family: Inter, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width: 1460px; margin: 0 auto; }
+  .hero h1 { margin: 0 0 6px; font-size: 26px; color: #fff; letter-spacing: -0.01em; }
+  .hero p { margin: 0 0 14px; color: #94a3b8; font-size: 15px; max-width: 780px; line-height: 1.55; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: #1e293b; color: #cbd5e1; border: 1px solid #334155; }
+  .steps { margin-top: 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
+  .step { background: #111c33; border: 1px solid #1f2b44; border-radius: 10px; padding: 12px 14px; font-size: 13px; color: #cbd5e1; line-height: 1.5; }
+  .step b { color: #fff; display: block; margin-bottom: 2px; font-size: 13px; }
+  .step code { background: #1e293b; padding: 1px 5px; border-radius: 4px; color: #a5f3fc; font-size: 12px; }
+  .idem { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .idem input { flex: 1; min-width: 0; background: #0b1324; border: 1px solid #334155; color: #e2e8f0; border-radius: 6px; padding: 6px 8px; font: 12px ui-monospace, monospace; }
+  .idem button { background: #0f766e; color: #fff; border: 0; border-radius: 6px; padding: 6px 10px; font: 600 12px Inter, sans-serif; cursor: pointer; }
+  .links { margin-top: 14px; font-size: 13px; }
+  .links a { color: #5eead4; text-decoration: none; margin-right: 16px; }
+  .swagger-ui .topbar { display: none; }
+  .swagger-ui .info { margin: 30px 0 20px; }
+</style>
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <h1>Kosta API</h1>
+      <p>Double-entry ledger and payments API for wallet-based fintech products: wallets, transfers, bank payouts with admin review and signed deposit webhooks. Built so money cannot be created, lost or spent twice.</p>
+      <div class="chips">
+        <span class="chip">Node.js 22</span><span class="chip">TypeScript strict</span><span class="chip">Fastify 5</span>
+        <span class="chip">PostgreSQL 16</span><span class="chip">OpenAPI 3.1</span><span class="chip">37 integration tests</span><span class="chip">Docker</span><span class="chip">CI</span>
+      </div>
+      <div class="steps" id="steps">
+        <div class="step"><b>1. Get a key</b>Open <code>Sandbox</code> &gt; <code>POST /sandbox/api-keys</code>, click Try it out, then Execute.</div>
+        <div class="step"><b>2. Authorize</b>Click <code>Authorize</code> below and paste the <code>api_key</code> from the response.</div>
+        <div class="step"><b>3. Open and fund a wallet</b><code>POST /v1/accounts</code>, then <code>POST /sandbox/deposits</code> with its id.</div>
+        <div class="step"><b>4. Move money</b>Money-moving calls need an Idempotency-Key. Use this one, or send it twice to watch the replay:
+          <div class="idem"><input id="idem" readonly><button type="button" id="copy">Copy</button><button type="button" id="new">New</button></div>
+        </div>
+      </div>
+      <div class="links" id="links"></div>
+    </div>
+  </header>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5.35.0/swagger-ui-bundle.js" crossorigin></script>
+  <script>
+    (function () {
+      var input = document.getElementById('idem');
+      function fresh() { input.value = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)); }
+      fresh();
+      document.getElementById('new').addEventListener('click', fresh);
+      document.getElementById('copy').addEventListener('click', function () {
+        var btn = this;
+        navigator.clipboard.writeText(input.value).then(function () {
+          btn.textContent = 'Copied';
+          setTimeout(function () { btn.textContent = 'Copy'; }, 1200);
+        }, function () { input.select(); });
+      });
+
+      fetch('openapi.json').then(function (r) { return r.json(); }).then(function (spec) {
+        var hasSandbox = (spec.tags || []).some(function (t) { return t.name === 'Sandbox'; });
+        var live = (spec.servers || []).some(function (s) { return s.url.indexOf('localhost') === -1; });
+        if (!hasSandbox || !live) {
+          document.getElementById('steps').innerHTML =
+            '<div class="step"><b>Run it locally</b><code>docker compose up</code>, then <code>npx tsx scripts/seed.ts</code> for API keys. Try it out sends requests to <code>http://localhost:3000</code>.</div>';
+        }
+        document.getElementById('links').innerHTML =
+          '<a href="openapi.json">OpenAPI 3.1 spec (JSON)</a>' +
+          '<a href="https://github.com/mighty-odewumi/kosta">Source code and tests</a>';
+
+        window.ui = SwaggerUIBundle({
+          spec: spec,
+          dom_id: '#swagger-ui',
+          deepLinking: true,
+          docExpansion: 'list',
+          defaultModelsExpandDepth: 0,
+          displayRequestDuration: true,
+          persistAuthorization: true,
+          filter: true,
+          tryItOutEnabled: false,
+          presets: [SwaggerUIBundle.presets.apis],
+          layout: 'BaseLayout'
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

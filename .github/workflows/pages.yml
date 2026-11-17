@@ -1,0 +1,41 @@
+name: Publish Swagger docs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Regenerate the spec from the code so the docs can never drift from the API.
+      # Set the repository variable PUBLIC_API_URL to your deployed API to make Try it out hit it live.
+      - run: npm run docs:export
+        env:
+          SANDBOX_MODE: ${{ vars.PUBLIC_API_URL != '' && 'true' || 'false' }}
+          PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4

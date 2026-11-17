@@ -1,0 +1,29 @@
+# One-click deploy of the public sandbox on Render (render.com > New > Blueprint).
+services:
+  - type: web
+    name: kosta-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npx tsx scripts/migrate.ts && node dist/server.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: kosta-db
+          property: connectionString
+      - key: SANDBOX_MODE
+        value: "true"
+      - key: CORS_ORIGINS
+        value: https://mighty-odewumi.github.io
+      - key: WEBHOOK_SECRET
+        generateValue: true
+      - key: RATE_LIMIT_MAX
+        value: "120"
+
+databases:
+  - name: kosta-db
+    plan: free
+    postgresMajorVersion: "16"
