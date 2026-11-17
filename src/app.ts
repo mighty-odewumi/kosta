@@ -108,7 +108,7 @@ export async function buildApp(opts: FastifyServerOptions = {}) {
             type: 'apiKey',
             in: 'header',
             name: 'X-Kosta-Signature',
-            description: 't=<unix seconds>,v1=<hex HMAC-SHA256 of "<t>.<raw body>">',
+            description: 'Format: `t=<unix seconds>,v1=<hex>` where hex is the HMAC-SHA256 of `<t>.<raw body>` using the shared webhook secret.',
           },
         },
       },
