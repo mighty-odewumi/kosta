@@ -212,7 +212,7 @@
     $('startBtn').addEventListener('click', startSession);
     $('resetBtn').addEventListener('click', resetSession);
 
-    fetch('openapi.json').then(function (r) { return r.json(); }).then(function (spec) {
+    fetch('openapi.json', { cache: 'no-cache' }).then(function (r) { return r.json(); }).then(function (spec) {
       var servedByApi = location.pathname.indexOf('/docs') === 0;
       if (servedByApi) spec.servers = [{ url: location.origin, description: 'This server' }];
       var server = (spec.servers || [])[0];
