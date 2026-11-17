@@ -5,7 +5,7 @@ import { Type } from 'typebox';
 import { actorOf, authenticate, createApiKey } from '../auth.js';
 import { withTx } from '../db.js';
 import { creditDeposit } from '../ledger/deposits.js';
-import { Uuid, errorRef, standardErrors } from '../schemas.js';
+import { Uuid, errors, ok } from '../schemas.js';
 import { loadAccount } from '../views.js';
 
 /**
@@ -21,31 +21,39 @@ export default async function sandboxRoutes(app: FastifyInstance) {
       config: { rateLimit: { max: 10, timeWindow: '1 hour' } },
       schema: {
         tags: ['Sandbox'],
-        summary: 'Get a sandbox API key',
+        summary: 'Get a test API key',
         description:
-          'Issues a fresh API key for the public sandbox. Start here: copy `api_key`, click **Authorize** at the ' +
-          'top of the page and paste it. Use role `admin` to try payout approval, freezes, the audit log and ' +
-          'reconciliation. Sandbox data is fake and may be reset at any time.',
+          'Gives you a free key for this test sandbox. On the docs page you do not need to copy it: it is applied ' +
+          'automatically, so every other request is signed in. Choose role `admin` to also try withdrawal approval, ' +
+          'freezing wallets, the activity log and the books check. Everything here is test money.',
         body: Type.Object(
           {
-            role: Type.Optional(Type.Union([Type.Literal('client'), Type.Literal('admin')], { default: 'client' })),
-            name: Type.Optional(Type.String({ minLength: 1, maxLength: 60, examples: ['reviewer'] })),
+            role: Type.Optional(
+              Type.Union([Type.Literal('client'), Type.Literal('admin')], {
+                default: 'admin',
+                description: 'client sees only its own wallets. admin can also review withdrawals and see everything.',
+                examples: ['admin'],
+              }),
+            ),
+            name: Type.Optional(Type.String({ minLength: 1, maxLength: 60, description: 'Any name, for the activity log.', examples: ['reviewer'] })),
           },
           { additionalProperties: false },
         ),
         response: {
-          201: Type.Object({
-            api_key: Type.String({ examples: ['ks_live_Qm9vZ3dhcnRzLWlzLXJlYWw'] }),
-            role: Type.String(),
-            note: Type.String(),
-          }),
-          400: errorRef,
-          429: errorRef,
+          201: ok(
+            Type.Object({
+              api_key: Type.String({ description: 'Your key. It is only shown once.', examples: ['ks_admin_Qm9vZ3dhcnRzLWlzLXJlYWw'] }),
+              role: Type.String({ examples: ['admin'] }),
+              note: Type.String({ examples: ['Shown once. Only a SHA-256 hash of this key is stored.'] }),
+            }),
+            'Your test key.',
+          ),
+          ...errors([400, 429]),
         },
       },
     },
     async (request, reply) => {
-      const role = request.body.role ?? 'client';
+      const role = request.body.role ?? 'admin';
       const key = await createApiKey(`sandbox:${request.body.name ?? 'reviewer'}`, role);
       return reply.code(201).send({
         api_key: key.secret,
@@ -61,26 +69,34 @@ export default async function sandboxRoutes(app: FastifyInstance) {
       preValidation: async (request) => authenticate(request),
       schema: {
         tags: ['Sandbox'],
-        summary: 'Fund a wallet with test money',
+        summary: 'Add test money to a wallet',
         description:
-          'Simulates a payment provider confirming a deposit, using exactly the same ledger code path as the ' +
-          'signed webhook. Use it to put money in a wallet before trying transfers and withdrawals.',
+          'Pretends a customer paid in through a payment provider, so you have money to play with. It goes through ' +
+          'exactly the same ledger code as a real, signed deposit.',
         security: [{ bearerAuth: [] }],
         body: Type.Object(
           {
-            account_id: Uuid,
+            account_id: Type.String({ format: 'uuid', description: 'One of your wallets.' }),
             amount: Type.Integer({
               minimum: 1,
               maximum: 100_000_000,
-              description: 'Minor units, up to 1,000,000.00 per call.',
+              description: 'In the smallest unit, up to 100,000,000 (1,000,000.00) per call. 500000 is NGN 5,000.00.',
               examples: [500000],
             }),
           },
           { additionalProperties: false },
         ),
         response: {
-          201: Type.Object({ deposit_id: Uuid, account_id: Uuid, amount: Type.Integer(), balance: Type.Integer() }),
-          ...standardErrors,
+          201: ok(
+            Type.Object({
+              deposit_id: Uuid,
+              account_id: Uuid,
+              amount: Type.Integer({ examples: [500000] }),
+              balance: Type.Integer({ description: 'The wallet balance after the deposit.', examples: [500000] }),
+            }),
+            'Money added.',
+          ),
+          ...errors([400, 401, 404]),
         },
       },
     },

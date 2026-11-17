@@ -4,7 +4,7 @@ import { Type } from 'typebox';
 import { actorOf } from '../auth.js';
 import { audit } from '../audit.js';
 import { getPool, withTx } from '../db.js';
-import { Currency, IdParams, PageQuery, Paginated, standardErrors } from '../schemas.js';
+import { Account, Currency, IdParams, PageQuery, Paginated, Posting, errors, ok } from '../schemas.js';
 import { ACCOUNT_COLUMNS, accountView, loadAccount, type AccountRow } from '../views.js';
 
 export default async function accountRoutes(app: FastifyInstance) {
@@ -16,17 +16,21 @@ export default async function accountRoutes(app: FastifyInstance) {
     {
       schema: {
         tags: ['Accounts'],
-        summary: 'Open a wallet account',
-        description: 'Creates a single-currency customer wallet owned by the calling API key. Starts at a zero balance.',
+        summary: 'Open a wallet',
+        description:
+          'Creates a new wallet for one currency. It starts empty and belongs to the API key that created it, ' +
+          'so other clients cannot see it or spend from it.',
         security,
         body: Type.Object(
           {
             currency: Currency,
-            label: Type.Optional(Type.String({ minLength: 1, maxLength: 80, examples: ['Ada main wallet'] })),
+            label: Type.Optional(
+              Type.String({ minLength: 1, maxLength: 80, description: 'Optional name to help you recognise it.', examples: ["Ada's wallet"] }),
+            ),
           },
           { additionalProperties: false },
         ),
-        response: { 201: Type.Ref('Account'), ...standardErrors },
+        response: { 201: ok(Account, 'Your new wallet.'), ...errors([400, 401]) },
       },
     },
     async (request, reply) => {
@@ -52,10 +56,11 @@ export default async function accountRoutes(app: FastifyInstance) {
     {
       schema: {
         tags: ['Accounts'],
-        summary: 'List your accounts',
+        summary: 'List your wallets',
+        description: 'Every wallet your key has opened, newest first.',
         security,
         querystring: PageQuery,
-        response: { 200: Paginated(Type.Ref('Account')), ...standardErrors },
+        response: { 200: ok(Paginated(Type.Ref('Account')), 'A page of your wallets.'), ...errors([400, 401]) },
       },
     },
     async (request) => {
@@ -81,10 +86,11 @@ export default async function accountRoutes(app: FastifyInstance) {
     {
       schema: {
         tags: ['Accounts'],
-        summary: 'Get an account and its balance',
+        summary: 'Check a wallet',
+        description: 'Shows the current balance and status of one of your wallets.',
         security,
         params: IdParams,
-        response: { 200: Type.Ref('Account'), ...standardErrors },
+        response: { 200: ok(Account, 'The wallet and its balance right now.'), ...errors([401, 404]) },
       },
     },
     async (request) => accountView(await loadAccount(getPool(), request.params.id, request.apiKey!)),
@@ -95,13 +101,17 @@ export default async function accountRoutes(app: FastifyInstance) {
     {
       schema: {
         tags: ['Accounts'],
-        summary: 'Account statement',
+        summary: 'Wallet statement',
         description:
-          'Every ledger posting that touched this account, newest first, with the running balance after each one. Cursor-paginated so it stays fast on large accounts.',
+          'Every movement in and out of this wallet, newest first, like a bank statement. Each line shows the ' +
+          'balance right after it. Results come in pages so it stays fast even for busy wallets.',
         security,
         params: IdParams,
         querystring: PageQuery,
-        response: { 200: Paginated(Type.Ref('Posting')), ...standardErrors },
+        response: {
+          200: ok(Paginated(Type.Ref('Posting')), 'A page of statement lines, newest first.'),
+          ...errors([400, 401, 404]),
+        },
       },
     },
     async (request) => {

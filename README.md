@@ -138,7 +138,7 @@ curl -s localhost:3000/v1/admin/reconciliation -H "authorization: Bearer $ADMIN"
 
 ## Public sandbox and live docs
 
-With `SANDBOX_MODE=true` the API exposes two extra endpoints so anyone can try it from Swagger UI with no setup: get a key, open a wallet, fund it, then transfer, withdraw and approve.
+With `SANDBOX_MODE=true` the API exposes two extra endpoints so anyone can try it from Swagger UI with no setup. The docs page has a **Start a sandbox session** button that creates a test key, signs Swagger in with it and opens two funded wallets. After that, request bodies fill in the visitor's own wallet ids and a fresh Idempotency-Key is generated for every Execute, so nothing needs to be copied or pasted.
 
 - **Deploy the API:** on [Render](https://render.com) choose New > Blueprint and point it at this repo. `render.yaml` creates the API and a Postgres database, runs migrations on start and enables the sandbox.
 - **Point the docs at it:** in the GitHub repo, set the Actions variable `PUBLIC_API_URL` to the Render URL and re-run the "Publish Swagger docs" workflow. Swagger UI's Try it out then sends real requests to the live API.
@@ -148,7 +148,7 @@ Sandbox mode must never be enabled for real money.
 
 ## Tests
 
-37 integration tests run against a real PostgreSQL database (no mocks for money paths):
+38 integration tests run against a real PostgreSQL database (no mocks for money paths):
 
 ```bash
 npm test

@@ -8,7 +8,7 @@ import { getPool } from '../db.js';
 import { AppError, Errors } from '../errors.js';
 import { idempotent } from '../idempotency.js';
 import { postEntry } from '../ledger/ledger.js';
-import { IdParams, IdempotencyHeaders, MinorAmount, Uuid, standardErrors } from '../schemas.js';
+import { IdParams, IdempotencyHeaders, MinorAmount, Transfer, errors, ok } from '../schemas.js';
 import { TRANSFER_COLUMNS, loadAccount, transferView } from '../views.js';
 
 export default async function transferRoutes(app: FastifyInstance) {
@@ -20,23 +20,26 @@ export default async function transferRoutes(app: FastifyInstance) {
     {
       schema: {
         tags: ['Transfers'],
-        summary: 'Move money between two wallets',
+        summary: 'Send money to another wallet',
         description:
-          'Atomically debits the source wallet and credits the destination wallet in one balanced journal entry. ' +
-          'The source must belong to the caller; the destination can be any customer wallet in the same currency. ' +
-          'Requires an Idempotency-Key header: retries return the original result and never move money twice.',
+          'Moves money from one of your wallets to any other wallet in the same currency. Both sides change ' +
+          'together or not at all, so money is never lost halfway. If the sender does not have enough, nothing ' +
+          'moves and you get insufficient_funds. Send an Idempotency-Key so a retried request never pays twice.',
         security,
         headers: IdempotencyHeaders,
         body: Type.Object(
           {
-            from_account_id: Uuid,
-            to_account_id: Uuid,
+            from_account_id: Type.String({ format: 'uuid', description: 'Your wallet the money comes from.' }),
+            to_account_id: Type.String({ format: 'uuid', description: 'The wallet receiving the money.' }),
             amount: MinorAmount,
-            narration: Type.Optional(Type.String({ maxLength: 140, examples: ['Rent share for March'] })),
+            narration: Type.Optional(Type.String({ maxLength: 140, description: 'A short note, like a bank transfer narration.', examples: ['Lunch'] })),
           },
           { additionalProperties: false },
         ),
-        response: { 201: Type.Ref('Transfer'), ...standardErrors },
+        response: {
+          201: ok(Transfer, 'Done. The money has moved.'),
+          ...errors([400, 401, 404, 409, 422, 423]),
+        },
       },
     },
     async (request, reply) =>
@@ -82,10 +85,11 @@ export default async function transferRoutes(app: FastifyInstance) {
     {
       schema: {
         tags: ['Transfers'],
-        summary: 'Get a transfer',
+        summary: 'Look up a transfer',
+        description: 'Shows a transfer you sent or received.',
         security,
         params: IdParams,
-        response: { 200: Type.Ref('Transfer'), ...standardErrors },
+        response: { 200: ok(Transfer, 'The transfer.'), ...errors([401, 404], { 404: { message: 'Transfer not found.' } }) },
       },
     },
     async (request) => {

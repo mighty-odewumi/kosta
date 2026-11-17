@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kosta API | Swagger UI</title>
-<meta name="description" content="Interactive Swagger docs for Kosta, a double-entry ledger and payments API for fintech products.">
+<meta name="description" content="Interactive Swagger docs for Kosta, a payments and ledger API for wallet apps.">
 <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.35.0/swagger-ui.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
@@ -16,13 +16,24 @@
   .hero p { margin: 0 0 14px; color: #94a3b8; font-size: 15px; max-width: 780px; line-height: 1.55; }
   .chips { display: flex; flex-wrap: wrap; gap: 8px; }
   .chip { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: #1e293b; color: #cbd5e1; border: 1px solid #334155; }
-  .steps { margin-top: 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
-  .step { background: #111c33; border: 1px solid #1f2b44; border-radius: 10px; padding: 12px 14px; font-size: 13px; color: #cbd5e1; line-height: 1.5; }
-  .step b { color: #fff; display: block; margin-bottom: 2px; font-size: 13px; }
-  .step code { background: #1e293b; padding: 1px 5px; border-radius: 4px; color: #a5f3fc; font-size: 12px; }
-  .idem { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
-  .idem input { flex: 1; min-width: 0; background: #0b1324; border: 1px solid #334155; color: #e2e8f0; border-radius: 6px; padding: 6px 8px; font: 12px ui-monospace, monospace; }
-  .idem button { background: #0f766e; color: #fff; border: 0; border-radius: 6px; padding: 6px 10px; font: 600 12px Inter, sans-serif; cursor: pointer; }
+  .panel { margin-top: 18px; background: #111c33; border: 1px solid #1f2b44; border-radius: 12px; padding: 16px; font-size: 14px; color: #cbd5e1; line-height: 1.55; }
+  .panel h2 { margin: 0 0 4px; font-size: 15px; color: #fff; }
+  .panel p { margin: 0 0 12px; font-size: 14px; color: #94a3b8; }
+  .panel code { background: #1e293b; padding: 1px 5px; border-radius: 4px; color: #a5f3fc; font-size: 12.5px; }
+  .btn { background: #14b8a6; color: #04201d; border: 0; border-radius: 8px; padding: 10px 16px; font: 600 14px Inter, sans-serif; cursor: pointer; }
+  .btn:disabled { opacity: .6; cursor: progress; }
+  .link-btn { background: none; border: 0; color: #5eead4; font: 500 13px Inter, sans-serif; cursor: pointer; padding: 0; margin-left: 12px; }
+  .status { margin-top: 10px; font-size: 13px; color: #94a3b8; min-height: 18px; }
+  .status.err { color: #fca5a5; }
+  .session { display: none; }
+  .session.on { display: block; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; margin: 10px 0 12px; }
+  .card { background: #0b1324; border: 1px solid #1f2b44; border-radius: 10px; padding: 10px 12px; }
+  .card b { display: block; color: #fff; font-size: 13px; margin-bottom: 2px; }
+  .card span { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: #a5f3fc; word-break: break-all; }
+  .card small { display: block; color: #94a3b8; margin-top: 2px; }
+  .next { margin: 0; padding-left: 18px; color: #cbd5e1; }
+  .next li { margin: 2px 0; }
   .links { margin-top: 14px; font-size: 13px; }
   .links a { color: #5eead4; text-decoration: none; margin-right: 16px; }
   .swagger-ui .topbar { display: none; }
@@ -33,64 +44,205 @@
   <header class="hero">
     <div class="wrap">
       <h1>Kosta API</h1>
-      <p>Double-entry ledger and payments API for wallet-based fintech products: wallets, transfers, bank payouts with admin review and signed deposit webhooks. Built so money cannot be created, lost or spent twice.</p>
+      <p>A payments backend for wallet apps: wallets, transfers, bank withdrawals with review, and deposits from payment providers. It keeps a proper ledger, so balances are always right and money can never be spent twice.</p>
       <div class="chips">
-        <span class="chip">Node.js 22</span><span class="chip">TypeScript strict</span><span class="chip">Fastify 5</span>
-        <span class="chip">PostgreSQL 16</span><span class="chip">OpenAPI 3.1</span><span class="chip">37 integration tests</span><span class="chip">Docker</span><span class="chip">CI</span>
+        <span class="chip">Node.js 22</span><span class="chip">TypeScript</span><span class="chip">Fastify 5</span>
+        <span class="chip">PostgreSQL 16</span><span class="chip">OpenAPI 3.1</span><span class="chip">38 integration tests</span><span class="chip">Docker</span><span class="chip">CI</span>
       </div>
-      <div class="steps" id="steps">
-        <div class="step"><b>1. Get a key</b>Open <code>Sandbox</code> &gt; <code>POST /sandbox/api-keys</code>, click Try it out, then Execute.</div>
-        <div class="step"><b>2. Authorize</b>Click <code>Authorize</code> below and paste the <code>api_key</code> from the response.</div>
-        <div class="step"><b>3. Open and fund a wallet</b><code>POST /v1/accounts</code>, then <code>POST /sandbox/deposits</code> with its id.</div>
-        <div class="step"><b>4. Move money</b>Money-moving calls need an Idempotency-Key. Use this one, or send it twice to watch the replay:
-          <div class="idem"><input id="idem" readonly><button type="button" id="copy">Copy</button><button type="button" id="new">New</button></div>
+
+      <div class="panel" id="start">
+        <h2>Try it in one click</h2>
+        <p>This makes you a test key, signs this page in with it, and opens two test wallets with money in the first one. Nothing to copy or paste. All money here is pretend.</p>
+        <button class="btn" id="startBtn" type="button">Start a sandbox session</button>
+        <div class="status" id="status"></div>
+      </div>
+
+      <div class="panel session" id="session">
+        <h2>You're signed in <button class="link-btn" id="resetBtn" type="button">Start over</button></h2>
+        <div class="grid">
+          <div class="card"><b>Wallet A</b><span id="walletA"></span><small id="walletABal"></small></div>
+          <div class="card"><b>Wallet B</b><span id="walletB"></span><small id="walletBBal"></small></div>
         </div>
+        <p>Every request below fills in these wallet ids for you, and a fresh Idempotency-Key is made each time you press Execute. Things to try:</p>
+        <ol class="next">
+          <li><b>Transfers</b> &gt; Send money to another wallet &gt; Execute. Then check Wallet A again.</li>
+          <li>Set the amount higher than the balance to see <code>insufficient_funds</code>.</li>
+          <li>Type your own Idempotency-Key and press Execute twice: the second answer is a replay and no extra money moves.</li>
+          <li><b>Withdrawals</b> &gt; Withdraw to a bank account, then <b>Admin</b> &gt; Approve a withdrawal.</li>
+          <li><b>Admin</b> &gt; Check the books balance.</li>
+        </ol>
       </div>
-      <div class="links" id="links"></div>
+
+      <div class="panel" id="local" style="display:none">
+        <h2>Run it locally</h2>
+        <p style="margin:0"><code>docker compose up</code>, then <code>npx tsx scripts/seed.ts</code> for API keys. Requests on this page go to <code>http://localhost:3000</code>.</p>
+      </div>
+
+      <div class="links">
+        <a href="openapi.json">OpenAPI 3.1 spec (JSON)</a>
+        <a href="https://github.com/mighty-odewumi/kosta">Source code and tests</a>
+      </div>
     </div>
   </header>
   <div id="swagger-ui"></div>
   <script src="https://unpkg.com/swagger-ui-dist@5.35.0/swagger-ui-bundle.js" crossorigin></script>
   <script>
-    (function () {
-      var input = document.getElementById('idem');
-      function fresh() { input.value = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)); }
-      fresh();
-      document.getElementById('new').addEventListener('click', fresh);
-      document.getElementById('copy').addEventListener('click', function () {
-        var btn = this;
-        navigator.clipboard.writeText(input.value).then(function () {
-          btn.textContent = 'Copied';
-          setTimeout(function () { btn.textContent = 'Copy'; }, 1200);
-        }, function () { input.select(); });
-      });
+  (function () {
+    var PLACEHOLDER = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
+    var KEY_PLACEHOLDER = 'new-key-per-click';
+    var STORE = 'kosta-docs-session';
+    var state = load() || {};
+    var base = '';
 
-      fetch('openapi.json').then(function (r) { return r.json(); }).then(function (spec) {
-        var hasSandbox = (spec.tags || []).some(function (t) { return t.name === 'Sandbox'; });
-        var live = (spec.servers || []).some(function (s) { return s.url.indexOf('localhost') === -1; });
-        if (!hasSandbox || !live) {
-          document.getElementById('steps').innerHTML =
-            '<div class="step"><b>Run it locally</b><code>docker compose up</code>, then <code>npx tsx scripts/seed.ts</code> for API keys. Try it out sends requests to <code>http://localhost:3000</code>.</div>';
-        }
-        document.getElementById('links').innerHTML =
-          '<a href="openapi.json">OpenAPI 3.1 spec (JSON)</a>' +
-          '<a href="https://github.com/mighty-odewumi/kosta">Source code and tests</a>';
+    function load() { try { return JSON.parse(localStorage.getItem(STORE)); } catch (e) { return null; } }
+    function save() { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} }
+    function uuid() {
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+      return 'k-' + Date.now().toString(16) + '-' + Math.random().toString(16).slice(2);
+    }
+    function money(minor) { return 'NGN ' + (minor / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 }); }
+    function $(id) { return document.getElementById(id); }
 
-        window.ui = SwaggerUIBundle({
-          spec: spec,
-          dom_id: '#swagger-ui',
-          deepLinking: true,
-          docExpansion: 'list',
-          defaultModelsExpandDepth: 0,
-          displayRequestDuration: true,
-          persistAuthorization: true,
-          filter: true,
-          tryItOutEnabled: false,
-          presets: [SwaggerUIBundle.presets.apis],
-          layout: 'BaseLayout'
+    function setStatus(text, isError) {
+      var el = $('status');
+      el.textContent = text;
+      el.className = 'status' + (isError ? ' err' : '');
+    }
+
+    function render() {
+      var on = !!(state.key && state.walletA);
+      $('session').className = 'panel session' + (on ? ' on' : '');
+      $('start').style.display = on ? 'none' : '';
+      if (!on) return;
+      $('walletA').textContent = state.walletA;
+      $('walletB').textContent = state.walletB || 'Open another wallet to set this';
+      $('walletABal').textContent = state.balanceA != null ? 'Balance after setup: ' + money(state.balanceA) : '';
+      $('walletBBal').textContent = state.walletB ? 'Receives your test transfers' : '';
+    }
+
+    function authorize(key) {
+      state.key = key;
+      save();
+      if (window.ui) {
+        window.ui.authActions.authorize({
+          bearerAuth: { name: 'bearerAuth', schema: { type: 'http', scheme: 'bearer' }, value: key }
         });
+      }
+    }
+
+    function call(method, path, body) {
+      var headers = { 'content-type': 'application/json' };
+      if (state.key) headers.authorization = 'Bearer ' + state.key;
+      return fetch(base + path, { method: method, headers: headers, body: body ? JSON.stringify(body) : undefined })
+        .then(function (r) {
+          return r.json().then(function (data) {
+            if (!r.ok) throw new Error((data && data.error && data.error.message) || ('Request failed (' + r.status + ')'));
+            return data;
+          });
+        });
+    }
+
+    function startSession() {
+      var btn = $('startBtn');
+      btn.disabled = true;
+      setStatus('Connecting...');
+      var slow = setTimeout(function () {
+        setStatus('Waking up the server. On the free plan this can take about 30 seconds the first time...');
+      }, 4000);
+      state = {};
+      call('POST', '/sandbox/api-keys', { role: 'admin', name: 'docs-visitor' })
+        .then(function (res) { clearTimeout(slow); authorize(res.api_key); setStatus('Opening two wallets...'); })
+        .then(function () { return call('POST', '/v1/accounts', { currency: 'NGN', label: "Ada's wallet" }); })
+        .then(function (a) { state.walletA = a.id; return call('POST', '/v1/accounts', { currency: 'NGN', label: "Tunde's wallet" }); })
+        .then(function (b) { state.walletB = b.id; setStatus('Adding NGN 5,000.00 of test money...'); return call('POST', '/sandbox/deposits', { account_id: state.walletA, amount: 500000 }); })
+        .then(function (d) { state.balanceA = d.balance; save(); render(); setStatus(''); })
+        .catch(function (e) { clearTimeout(slow); setStatus('Could not start the session: ' + e.message, true); })
+        .then(function () { btn.disabled = false; });
+    }
+
+    function resetSession() {
+      state = {};
+      save();
+      if (window.ui) window.ui.authActions.logout(['bearerAuth']);
+      render();
+    }
+
+    // Fill Swagger's placeholder ids with the visitor's own sandbox ids, and give every
+    // money-moving request a fresh Idempotency-Key unless the visitor typed their own.
+    function requestInterceptor(req) {
+      if (req.url && req.url.indexOf(PLACEHOLDER) !== -1) {
+        var id = /withdrawals\//.test(req.url) ? state.lastWithdrawal
+          : /transfers\//.test(req.url) ? state.lastTransfer
+          : state.walletA;
+        if (id) req.url = req.url.split(PLACEHOLDER).join(id);
+      }
+      if (typeof req.body === 'string' && req.body.indexOf(PLACEHOLDER) !== -1) {
+        try {
+          var body = JSON.parse(req.body);
+          if (body.account_id === PLACEHOLDER && state.walletA) body.account_id = state.walletA;
+          if (body.from_account_id === PLACEHOLDER && state.walletA) body.from_account_id = state.walletA;
+          if (body.to_account_id === PLACEHOLDER && state.walletB) body.to_account_id = state.walletB;
+          req.body = JSON.stringify(body, null, 2);
+        } catch (e) {}
+      }
+      if (req.headers) {
+        Object.keys(req.headers).forEach(function (h) {
+          if (h.toLowerCase() === 'idempotency-key' && req.headers[h] === KEY_PLACEHOLDER) req.headers[h] = uuid();
+        });
+      }
+      return req;
+    }
+
+    function responseInterceptor(res) {
+      var url = res.url || '';
+      var data = res.body || {};
+      if (res.status === 201) {
+        if (/\/sandbox\/api-keys$/.test(url) && data.api_key) authorize(data.api_key);
+        else if (/\/v1\/accounts$/.test(url) && data.id) {
+          if (!state.walletA) state.walletA = data.id; else state.walletB = data.id;
+        }
+        else if (/\/v1\/transfers$/.test(url) && data.id) state.lastTransfer = data.id;
+        else if (/\/v1\/withdrawals$/.test(url) && data.id) state.lastWithdrawal = data.id;
+        save();
+        render();
+      }
+      return res;
+    }
+
+    $('startBtn').addEventListener('click', startSession);
+    $('resetBtn').addEventListener('click', resetSession);
+
+    fetch('openapi.json').then(function (r) { return r.json(); }).then(function (spec) {
+      var servedByApi = location.pathname.indexOf('/docs') === 0;
+      if (servedByApi) spec.servers = [{ url: location.origin, description: 'This server' }];
+      var server = (spec.servers || [])[0];
+      base = server ? server.url.replace(/\/$/, '') : location.origin;
+      var hasSandbox = (spec.tags || []).some(function (t) { return t.name === 'Sandbox'; });
+      var isLocal = base.indexOf('localhost') !== -1 && location.hostname !== 'localhost';
+      if (!hasSandbox || isLocal) {
+        $('start').style.display = 'none';
+        $('session').style.display = 'none';
+        $('local').style.display = '';
+      }
+
+      window.ui = SwaggerUIBundle({
+        spec: spec,
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        docExpansion: 'list',
+        defaultModelsExpandDepth: 0,
+        displayRequestDuration: true,
+        persistAuthorization: true,
+        tryItOutEnabled: true,
+        filter: true,
+        requestInterceptor: requestInterceptor,
+        responseInterceptor: responseInterceptor,
+        presets: [SwaggerUIBundle.presets.apis],
+        layout: 'BaseLayout',
+        onComplete: function () { if (state.key) authorize(state.key); render(); }
       });
-    })();
+    });
+  })();
   </script>
 </body>
 </html>

@@ -6,7 +6,7 @@ import { config } from '../config.js';
 import { getPool, withTx } from '../db.js';
 import { AppError } from '../errors.js';
 import { creditDeposit } from '../ledger/deposits.js';
-import { Currency, MinorAmount, Uuid, errorRef } from '../schemas.js';
+import { Currency, MinorAmount, Uuid, errors, ok } from '../schemas.js';
 
 export const SIGNATURE_HEADER = 'x-kosta-signature';
 
@@ -39,24 +39,26 @@ export function verifySignature(request: FastifyRequest): void {
 }
 
 const WebhookBody = Type.Object({
-  id: Type.String({ minLength: 1, maxLength: 128, description: 'Provider event id. Used for de-duplication.', examples: ['evt_8f2a1c'] }),
-  type: Type.String({ examples: ['deposit.succeeded'] }),
+  id: Type.String({ minLength: 1, maxLength: 128, description: "The provider's id for this notification.", examples: ['evt_8f2a1c'] }),
+  type: Type.String({ description: 'Only deposit.succeeded moves money. Other types are acknowledged and ignored.', examples: ['deposit.succeeded'] }),
   provider: Type.String({ minLength: 2, maxLength: 40, examples: ['paystack'] }),
   data: Type.Object({
     account_id: Uuid,
     amount: MinorAmount,
     currency: Currency,
-    reference: Type.String({ minLength: 1, maxLength: 128, description: 'Provider transaction reference.', examples: ['PSK_REF_0001'] }),
+    reference: Type.String({ minLength: 1, maxLength: 128, description: "The provider's payment reference.", examples: ['PSK_REF_0001'] }),
   }),
 });
 
 const WebhookResult = Type.Object({
-  status: Type.Union([
-    Type.Literal('processed'),
-    Type.Literal('duplicate'),
-    Type.Literal('ignored'),
-    Type.Literal('failed'),
-  ]),
+  status: Type.Union(
+    [Type.Literal('processed'), Type.Literal('duplicate'), Type.Literal('ignored'), Type.Literal('failed')],
+    {
+      description:
+        'processed: wallet credited. duplicate: already credited before, nothing changed. ignored: not a deposit. failed: could not be applied (see reason).',
+      examples: ['processed'],
+    },
+  ),
   deposit_id: Type.Optional(Uuid),
   reason: Type.Optional(Type.String()),
 });
@@ -71,16 +73,28 @@ export default async function webhookRoutes(app: FastifyInstance) {
       preValidation: async (request) => verifySignature(request),
       schema: {
         tags: ['Webhooks'],
-        summary: 'Receive a deposit notification from a payment provider',
+        summary: 'Payment received (called by your payment provider)',
         description:
-          'Credits a wallet when the provider confirms a payment. Security and safety:\n\n' +
-          '- HMAC-SHA256 signature in `X-Kosta-Signature: t=<unix>,v1=<hex>` computed over `<t>.<raw body>`\n' +
-          '- Requests older than 5 minutes are rejected (replay protection)\n' +
-          '- Each event id and each provider reference can only ever credit once, so provider retries are harmless\n' +
-          '- Always answers 200 for well-formed signed events so the provider stops retrying; failures are recorded for ops review',
+          'Your payment provider (Paystack, Flutterwave and so on) calls this when a customer pays in, and Kosta ' +
+          'credits their wallet. You do not call it yourself; on this docs page, use the Sandbox deposit instead.\n\n' +
+          'How it stays safe:\n\n' +
+          '- Every call must be signed with a secret only you and the provider know, sent in `X-Kosta-Signature`.\n' +
+          '- Calls older than 5 minutes are refused, so a captured request cannot be replayed later.\n' +
+          '- Providers often send the same notification more than once. Each payment is credited exactly once.\n' +
+          '- Kosta answers 200 to every properly signed call so the provider stops retrying, and records any that ' +
+          'could not be applied for the team to review.',
         security: [{ webhookSignature: [] }],
         body: WebhookBody,
-        response: { 200: WebhookResult, 400: errorRef, 401: errorRef },
+        response: {
+          200: ok(WebhookResult, 'Received. The status says what happened.'),
+          ...errors([400, 401], {
+            401: {
+              description: 'The signature is missing, wrong or too old.',
+              code: 'invalid_signature',
+              message: 'Webhook signature does not match.',
+            },
+          }),
+        },
       },
     },
     async (request) => {

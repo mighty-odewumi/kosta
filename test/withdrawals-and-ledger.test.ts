@@ -180,13 +180,21 @@ describe('statements', () => {
 });
 
 describe('API documentation', () => {
-  it('serves a valid OpenAPI 3.1 document covering every endpoint', async () => {
-    const res = await app.inject({ method: 'GET', url: '/docs/json' });
+  it('serves the Swagger page and a valid OpenAPI 3.1 document covering every endpoint', async () => {
+    const page = await app.inject({ method: 'GET', url: '/docs/' });
+    expect(page.statusCode).toBe(200);
+    expect(page.body).toContain('swagger-ui');
+    const res = await app.inject({ method: 'GET', url: '/docs/openapi.json' });
     expect(res.statusCode).toBe(200);
     const spec = res.json();
     expect(spec.openapi).toBe('3.1.0');
     expect(Object.keys(spec.paths)).toEqual(
       expect.arrayContaining(['/v1/transfers', '/v1/withdrawals', '/v1/webhooks/deposits', '/v1/admin/reconciliation']),
     );
+    // Every response has a human description and errors carry real examples, not generated filler.
+    const transfer = spec.paths['/v1/transfers'].post.responses;
+    expect(transfer['201'].description).toBe('Done. The money has moved.');
+    expect(transfer['422'].content['application/json'].example.error.code).toBe('insufficient_funds');
+    expect(JSON.stringify(spec)).not.toContain('Default Response');
   });
 });

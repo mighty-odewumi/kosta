@@ -13,6 +13,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev && npm install --no-save tsx
 COPY --from=build /app/dist ./dist
 COPY migrations ./migrations
+COPY docs ./docs
 COPY scripts ./scripts
 COPY src ./src
 USER node

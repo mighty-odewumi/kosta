@@ -5,7 +5,7 @@ import { actorOf, requireAdmin } from '../auth.js';
 import { audit } from '../audit.js';
 import { getPool, withTx } from '../db.js';
 import { Errors } from '../errors.js';
-import { IdParams, PageQuery, Uuid, Timestamp, standardErrors } from '../schemas.js';
+import { Account, IdParams, PageQuery, Uuid, Timestamp, errors, ok } from '../schemas.js';
 import { ACCOUNT_COLUMNS, accountView, type AccountRow } from '../views.js';
 
 export default async function adminRoutes(app: FastifyInstance) {
@@ -18,33 +18,34 @@ export default async function adminRoutes(app: FastifyInstance) {
       preHandler: requireAdmin,
       schema: {
         tags: ['Admin'],
-        summary: 'Run a ledger reconciliation',
+        summary: 'Check the books balance',
         description:
-          'Proves the books are correct. Checks that (1) postings in every currency sum to exactly zero, ' +
-          '(2) every cached account balance equals the sum of its postings, and (3) no journal entry is unbalanced. ' +
-          'Also returns system account positions: settlement (money that should be at the bank), funds held for ' +
-          'pending payouts, and fee revenue. Safe to run on a schedule and alert on ok = false.',
+          'An on-demand audit of the whole ledger. It confirms that money in and money out match exactly in every ' +
+          'currency, that every wallet balance agrees with its full history, and that no transaction is lopsided. ' +
+          'It also shows how much is owed to customers, how much is on hold for withdrawals and how much has been ' +
+          'earned in fees. If anything is off, ok is false and the problem is listed.',
         security,
         response: {
-          200: Type.Object({
-            ok: Type.Boolean(),
+          200: ok(Type.Object({
+            ok: Type.Boolean({ description: 'true when everything balances.' }),
             checked_at: Timestamp,
             currencies: Type.Array(
               Type.Object({
                 currency: Type.String(),
-                postings_total: Type.Integer({ description: 'Must be 0.' }),
-                customer_liabilities: Type.Integer({ description: 'Total owed to customers.' }),
-                settlement: Type.Integer(),
-                withdrawals_pending: Type.Integer(),
-                fee_revenue: Type.Integer(),
+                postings_total: Type.Integer({ description: 'Always 0 when the books balance.', examples: [0] }),
+                customer_liabilities: Type.Integer({ description: 'Total held in customer wallets.', examples: [500000] }),
+                settlement: Type.Integer({ description: 'Mirror of the money at the bank (negative means held for customers).', examples: [-500000] }),
+                withdrawals_pending: Type.Integer({ description: 'On hold for withdrawals awaiting review.', examples: [0] }),
+                fee_revenue: Type.Integer({ description: 'Fees earned.', examples: [0] }),
               }),
             ),
             mismatched_accounts: Type.Array(
               Type.Object({ account_id: Uuid, cached_balance: Type.Integer(), ledger_balance: Type.Integer() }),
+              { description: 'Wallets whose balance disagrees with their history. Empty when all is well.' },
             ),
-            unbalanced_entries: Type.Array(Uuid),
-          }),
-          ...standardErrors,
+            unbalanced_entries: Type.Array(Uuid, { description: 'Transactions that do not add up. Empty when all is well.' }),
+          }), 'The reconciliation report.'),
+          ...errors([401, 403]),
         },
       },
     },
@@ -101,8 +102,10 @@ export default async function adminRoutes(app: FastifyInstance) {
       preHandler: requireAdmin,
       schema: {
         tags: ['Admin'],
-        summary: 'Audit trail',
-        description: 'Who did what, when. Every state change (accounts, transfers, payouts, deposits, freezes) writes here in the same transaction as the change.',
+        summary: 'Activity log',
+        description:
+          'Who did what, and when. Every change (new wallets, transfers, withdrawals, deposits, freezes) is recorded ' +
+          'at the same moment it happens. Filter by a wallet or transfer id, or by action.',
         security,
         querystring: Type.Object({
           ...PageQuery.properties,
@@ -110,7 +113,7 @@ export default async function adminRoutes(app: FastifyInstance) {
           action: Type.Optional(Type.String({ examples: ['transfer.completed'] })),
         }),
         response: {
-          200: Type.Object({
+          200: ok(Type.Object({
             data: Type.Array(
               Type.Object({
                 id: Type.Integer(),
@@ -123,8 +126,8 @@ export default async function adminRoutes(app: FastifyInstance) {
               }),
             ),
             next_cursor: Type.Union([Type.String(), Type.Null()]),
-          }),
-          ...standardErrors,
+          }), 'A page of activity, newest first.'),
+          ...errors([400, 401, 403]),
         },
       },
     },
@@ -152,18 +155,21 @@ export default async function adminRoutes(app: FastifyInstance) {
         preHandler: requireAdmin,
         schema: {
           tags: ['Admin'],
-          summary: action === 'freeze' ? 'Freeze an account (compliance hold)' : 'Unfreeze an account',
+          summary: action === 'freeze' ? 'Freeze a wallet' : 'Unfreeze a wallet',
           description:
             action === 'freeze'
-              ? 'A frozen account can still receive money but cannot send transfers or request payouts.'
-              : 'Restores normal debits on a frozen account.',
+              ? 'Puts a compliance hold on a wallet. It can still receive money, but nothing can leave it until it is unfrozen.'
+              : 'Lifts the hold so the wallet can send money again.',
           security,
           params: IdParams,
           body: Type.Object(
-            { reason: Type.Optional(Type.String({ maxLength: 280, examples: ['Suspicious activity review'] })) },
+            { reason: Type.Optional(Type.String({ maxLength: 280, description: 'Why, for the activity log.', examples: ['Suspicious activity review'] })) },
             { additionalProperties: false },
           ),
-          response: { 200: Type.Ref('Account'), ...standardErrors },
+          response: {
+            200: ok(Account, action === 'freeze' ? 'The wallet is now frozen.' : 'The wallet is active again.'),
+            ...errors([401, 403, 404]),
+          },
         },
       },
       async (request) => {

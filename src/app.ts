@@ -3,7 +3,9 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
-import swaggerUi from '@fastify/swagger-ui';
+import { readFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Type } from 'typebox';
 import { authenticate } from './auth.js';
 import { config } from './config.js';
@@ -18,25 +20,25 @@ import adminRoutes from './routes/admin.js';
 import sandboxRoutes from './routes/sandbox.js';
 
 const API_DESCRIPTION = `
-Kosta is a double-entry ledger and payments API for wallet-based fintech products.
+Kosta is a payments backend for wallet apps. It keeps a proper ledger of every naira, cent or penny that moves, so balances are always right, money can never be spent twice, and every change can be traced.
 
-**Core guarantees**
+**What it guarantees**
 
-- **Double-entry accounting.** Every movement of money is a journal entry whose postings sum to zero. A deferred Postgres trigger rejects any unbalanced entry at commit time.
-- **No overdrafts.** Accounts are row-locked in a fixed order during each entry, and a database CHECK constraint stops customer balances going below zero even if application code is wrong.
-- **Exactly-once money movement.** Transfers and withdrawals require an \`Idempotency-Key\`. Retries replay the original response.
-- **Append-only ledger.** Postings and journal entries cannot be updated or deleted; corrections are new entries.
-- **Integer money.** All amounts are integers in minor units (kobo, cents). No floating point anywhere.
-- **Signed, replay-safe webhooks** for deposits, de-duplicated by event id and provider reference.
-- **Full audit trail** written in the same transaction as each change, plus an on-demand reconciliation report.
+- **Every movement balances.** Money is never created or lost: each transaction takes from one place and puts the same amount somewhere else. The database itself refuses anything that does not add up.
+- **No overdrafts, even under heavy load.** When many requests try to spend the same balance at once, only the ones the balance can cover go through.
+- **Safe retries.** Send an \`Idempotency-Key\` with transfers and withdrawals. If the same request arrives twice, say a phone retries after a timeout, the second one gets the original answer and no money moves again.
+- **History cannot be rewritten.** Ledger records cannot be edited or deleted. Mistakes are fixed with new, visible correcting entries.
+- **Whole numbers only.** Amounts are in the smallest unit (kobo, cents), so there are no rounding errors.
+- **Trusted deposits.** Notifications from payment providers must be signed, and the same payment can never be credited twice.
+- **A full paper trail.** Every action is logged, and a books check proves everything balances.
 
-**Authentication**
+**Signing in**
 
-Send \`Authorization: Bearer <api key>\`. Client keys see only the wallets they created. Admin keys can review payouts, freeze accounts, read the audit log and run reconciliation.
+Send your API key as \`Authorization: Bearer <key>\`. Client keys only see the wallets they opened. Admin keys can also review withdrawals, freeze wallets, read the activity log and run the books check.
 
-**Errors**
+**When something goes wrong**
 
-Every error has the shape \`{ "error": { "code": "...", "message": "...", "details": {} } }\`. Branch on \`code\`.
+Errors always look like \`{ "error": { "code": "...", "message": "..." } }\`, sometimes with extra \`details\`. Check \`code\` in your app; the message is written for people.
 `.trim();
 
 export async function buildApp(opts: FastifyServerOptions = {}) {
@@ -92,18 +94,22 @@ export async function buildApp(opts: FastifyServerOptions = {}) {
       ],
       tags: [
         ...(config.sandbox
-          ? [{ name: 'Sandbox', description: 'Start here on the public sandbox: get a key, then fund a wallet' }]
+          ? [{ name: 'Sandbox', description: 'Test helpers: get a key and add test money' }]
           : []),
-        { name: 'Accounts', description: 'Single-currency wallets and statements' },
-        { name: 'Transfers', description: 'Wallet-to-wallet transfers' },
-        { name: 'Withdrawals', description: 'Payouts to bank accounts with a hold, then review' },
-        { name: 'Webhooks', description: 'Inbound payment provider events' },
-        { name: 'Admin', description: 'Operations, compliance and finance tooling' },
-        { name: 'System', description: 'Health' },
+        { name: 'Accounts', description: 'Open wallets, check balances and read statements' },
+        { name: 'Transfers', description: 'Send money between wallets' },
+        { name: 'Withdrawals', description: 'Pay out to bank accounts, with review' },
+        { name: 'Webhooks', description: 'Payment notifications from your provider' },
+        { name: 'Admin', description: 'Review withdrawals, freeze wallets, see activity and check the books' },
+        { name: 'System', description: 'Is it up?' },
       ],
       components: {
         securitySchemes: {
-          bearerAuth: { type: 'http', scheme: 'bearer', description: 'API key, e.g. ks_live_xxx or ks_admin_xxx' },
+          bearerAuth: {
+            type: 'http',
+            scheme: 'bearer',
+            description: 'Your API key. On the docs page this is filled in for you when you start a sandbox session.',
+          },
           webhookSignature: {
             type: 'apiKey',
             in: 'header',
@@ -117,7 +123,13 @@ export async function buildApp(opts: FastifyServerOptions = {}) {
       buildLocalReference: (json, _baseUri, _fragment, i) => (json.$id as string) ?? `def-${i}`,
     },
   });
-  await app.register(swaggerUi, { routePrefix: '/docs', uiConfig: { docExpansion: 'list', deepLinking: true } });
+  // The same Swagger UI page published to GitHub Pages, served by the API itself at /docs.
+  const docsDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'docs');
+  app.get('/docs', { schema: { hide: true } }, (_req, reply) => reply.redirect('/docs/'));
+  app.get('/docs/', { schema: { hide: true } }, async (_req, reply) =>
+    reply.type('text/html; charset=utf-8').send(await readFile(join(docsDir, 'index.html'), 'utf8')),
+  );
+  app.get('/docs/openapi.json', { schema: { hide: true } }, async () => app.swagger());
 
   // Every /v1 route except inbound webhooks needs an API key.
   app.addHook('onRequest', async (request) => {
@@ -169,8 +181,14 @@ export async function buildApp(opts: FastifyServerOptions = {}) {
     {
       schema: {
         tags: ['System'],
-        summary: 'Liveness and database check',
-        response: { 200: Type.Object({ status: Type.Literal('ok'), database: Type.Literal('ok') }) },
+        summary: 'Health check',
+        description: 'Answers ok when the API is running and can reach its database.',
+        response: {
+          200: Type.Object(
+            { status: Type.Literal('ok'), database: Type.Literal('ok') },
+            { description: 'All good.' },
+          ),
+        },
       },
     },
     async () => {

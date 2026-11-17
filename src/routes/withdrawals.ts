@@ -9,7 +9,7 @@ import { getPool, withTx } from '../db.js';
 import { Errors } from '../errors.js';
 import { idempotent } from '../idempotency.js';
 import { getSystemAccountId, postEntry } from '../ledger/ledger.js';
-import { Destination, IdParams, IdempotencyHeaders, MinorAmount, Uuid, standardErrors } from '../schemas.js';
+import { Destination, IdParams, IdempotencyHeaders, MinorAmount, Withdrawal, errors, ok } from '../schemas.js';
 import { WITHDRAWAL_COLUMNS, loadAccount, withdrawalView } from '../views.js';
 
 /** Fee in minor units, rounded up so the platform never under-charges by a fraction. */
@@ -24,18 +24,26 @@ export default async function withdrawalRoutes(app: FastifyInstance) {
     {
       schema: {
         tags: ['Withdrawals'],
-        summary: 'Request a payout to a bank account',
+        summary: 'Withdraw to a bank account',
         description:
-          'Places a hold on amount + fee by moving it from the wallet into the withdrawals_pending system account, ' +
-          'so the funds cannot be spent twice while the payout is reviewed. An admin then approves (funds leave the ' +
-          'platform) or rejects (hold is released back to the wallet). Requires an Idempotency-Key header.',
+          'Asks to pay money out of a wallet to a bank account. The amount plus a 0.5% fee is set aside straight ' +
+          'away, so it cannot be spent again while the request waits for review. An admin then approves it (the ' +
+          'money leaves) or rejects it (the money goes back to the wallet). Send an Idempotency-Key so a retry never ' +
+          'creates a second withdrawal.',
         security,
         headers: IdempotencyHeaders,
         body: Type.Object(
-          { account_id: Uuid, amount: MinorAmount, destination: Destination },
+          {
+            account_id: Type.String({ format: 'uuid', description: 'Your wallet to withdraw from.' }),
+            amount: MinorAmount,
+            destination: Destination,
+          },
           { additionalProperties: false },
         ),
-        response: { 201: Type.Ref('Withdrawal'), ...standardErrors },
+        response: {
+          201: ok(Withdrawal, 'Request received. The money is on hold until an admin reviews it.'),
+          ...errors([400, 401, 404, 409, 422, 423]),
+        },
       },
     },
     async (request, reply) =>
@@ -78,10 +86,11 @@ export default async function withdrawalRoutes(app: FastifyInstance) {
     {
       schema: {
         tags: ['Withdrawals'],
-        summary: 'Get a withdrawal',
+        summary: 'Check a withdrawal',
+        description: 'Shows whether a withdrawal is still pending, completed or rejected.',
         security,
         params: IdParams,
-        response: { 200: Type.Ref('Withdrawal'), ...standardErrors },
+        response: { 200: ok(Withdrawal, 'The withdrawal.'), ...errors([401, 404], { 404: { message: 'Withdrawal not found.' } }) },
       },
     },
     async (request) => {
@@ -103,8 +112,8 @@ export default async function withdrawalRoutes(app: FastifyInstance) {
       preHandler: requireAdmin,
       schema: {
         tags: ['Admin'],
-        summary: 'Withdrawal review queue',
-        description: 'Oldest first, so payouts are reviewed in the order they were requested.',
+        summary: 'Withdrawals waiting for review',
+        description: 'The admin review queue. Oldest first, so requests are handled in the order they came in.',
         security,
         querystring: Type.Object({
           status: Type.Optional(
@@ -114,7 +123,10 @@ export default async function withdrawalRoutes(app: FastifyInstance) {
           ),
           limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100, default: 50 })),
         }),
-        response: { 200: Type.Object({ data: Type.Array(Type.Ref('Withdrawal')) }), ...standardErrors },
+        response: {
+          200: ok(Type.Object({ data: Type.Array(Type.Ref('Withdrawal')) }), 'Withdrawals with the requested status.'),
+          ...errors([400, 401, 403]),
+        },
       },
     },
     async (request) => {
@@ -127,7 +139,7 @@ export default async function withdrawalRoutes(app: FastifyInstance) {
   );
 
   const ReviewBody = Type.Object(
-    { note: Type.Optional(Type.String({ maxLength: 280, examples: ['Verified against KYC record'] })) },
+    { note: Type.Optional(Type.String({ maxLength: 280, description: 'Optional note for the record.', examples: ['Checked against KYC'] })) },
     { additionalProperties: false },
   );
 
@@ -138,17 +150,26 @@ export default async function withdrawalRoutes(app: FastifyInstance) {
         preHandler: requireAdmin,
         schema: {
           tags: ['Admin'],
-          summary: decision === 'approve' ? 'Approve and settle a payout' : 'Reject a payout and release the hold',
+          summary: decision === 'approve' ? 'Approve a withdrawal' : 'Reject a withdrawal',
           description:
             decision === 'approve'
-              ? 'Settles the hold: amount goes to the settlement account (money leaves the platform) and the fee is ' +
-                'recognised as revenue. Only pending withdrawals can be approved; the row is locked so two admins ' +
-                'cannot settle the same payout.'
-              : 'Returns amount + fee from withdrawals_pending to the customer wallet. Only pending withdrawals can be rejected.',
+              ? 'Pays out a pending withdrawal: the money leaves the platform and the fee is kept as revenue. ' +
+                'A withdrawal can only be approved once, even if two admins press approve at the same moment.'
+              : 'Turns down a pending withdrawal and puts the full amount, fee included, back in the wallet.',
           security,
           params: IdParams,
           body: ReviewBody,
-          response: { 200: Type.Ref('Withdrawal'), ...standardErrors },
+          response: {
+            200: ok(Withdrawal, decision === 'approve' ? 'Approved and paid out.' : 'Rejected. The money is back in the wallet.'),
+            ...errors([401, 403, 404, 409], {
+              404: { message: 'Withdrawal not found.' },
+              409: {
+                description: 'This withdrawal was already approved or rejected.',
+                code: 'invalid_state',
+                message: 'Withdrawal is already completed.',
+              },
+            }),
+          },
         },
       },
       async (request) => {

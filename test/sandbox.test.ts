@@ -16,7 +16,7 @@ afterAll(async () => {
 
 describe('public sandbox', () => {
   it('lets a reviewer self-issue a key, fund a wallet and transfer', async () => {
-    const keyRes = await app.inject({ method: 'POST', url: '/sandbox/api-keys', payload: { name: 'reviewer' } });
+    const keyRes = await app.inject({ method: 'POST', url: '/sandbox/api-keys', payload: { name: 'reviewer', role: 'client' } });
     expect(keyRes.statusCode).toBe(201);
     const key = keyRes.json().api_key as string;
     expect(key).toMatch(/^ks_live_/);
@@ -42,9 +42,15 @@ describe('public sandbox', () => {
     expect(await balanceOf(app, key, wallet.id)).toBe(300_000);
   });
 
+  it('issues an admin key by default so the docs can show every endpoint', async () => {
+    const res = await app.inject({ method: 'POST', url: '/sandbox/api-keys', payload: {} });
+    expect(res.json()).toMatchObject({ role: 'admin' });
+    expect(res.json().api_key).toMatch(/^ks_admin_/);
+  });
+
   it('cannot fund someone else\'s wallet or fund without a key', async () => {
     const theirs = await openAccount(app, other);
-    const key = (await app.inject({ method: 'POST', url: '/sandbox/api-keys', payload: {} })).json().api_key;
+    const key = (await app.inject({ method: 'POST', url: '/sandbox/api-keys', payload: { role: 'client' } })).json().api_key;
     const res = await app.inject({ method: 'POST', url: '/sandbox/deposits', headers: auth(key), payload: { account_id: theirs.id, amount: 1 } });
     expect(res.statusCode).toBe(404);
     const anon = await app.inject({ method: 'POST', url: '/sandbox/deposits', payload: { account_id: theirs.id, amount: 1 } });
