@@ -38,7 +38,10 @@ export default async function transferRoutes(app: FastifyInstance) {
         ),
         response: {
           201: ok(Transfer, 'Done. The money has moved.'),
-          ...errors([400, 401, 404, 409, 422, 423]),
+          ...errors([400, 401, 404, 409, 422, 423], {
+            400: { codes: ['validation_error', 'idempotency_key_required', 'invalid_json'] },
+            422: { codes: ['insufficient_funds', 'currency_mismatch', 'same_account', 'idempotency_key_reused', 'constraint_violation'] },
+          }),
         },
       },
     },

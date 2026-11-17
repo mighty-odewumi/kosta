@@ -88,11 +88,7 @@ export default async function webhookRoutes(app: FastifyInstance) {
         response: {
           200: ok(WebhookResult, 'Received. The status says what happened.'),
           ...errors([400, 401], {
-            401: {
-              description: 'The signature is missing, wrong or too old.',
-              code: 'invalid_signature',
-              message: 'Webhook signature does not match.',
-            },
+            401: { description: 'The signature is missing, wrong or too old.', codes: ['invalid_signature', 'signature_expired'] },
           }),
         },
       },

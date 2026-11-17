@@ -35,9 +35,9 @@
             "properties": {
               "code": {
                 "type": "string",
-                "description": "Stable, machine-readable reason. Check this in your app.",
+                "description": "Stable, machine-readable reason. Check this in your app. Each response lists the codes it can return.",
                 "examples": [
-                  "insufficient_funds"
+                  "not_found"
                 ]
               },
               "message": {
@@ -846,6 +846,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "Something in the request is missing or not valid.",
                   "required": [
                     "error"
                   ],
@@ -859,24 +860,27 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "validation_error",
+                            "invalid_json"
+                          ],
+                          "description": "One of:\n- `validation_error`: a field is missing, has the wrong type or is out of range.\n- `invalid_json`: the body could not be read as JSON."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "body/amount must be integer"
+                          ]
                         },
                         "details": {
                           "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "additionalProperties": true,
+                          "description": "Extra context: issues lists each field that failed and why."
                         }
                       }
                     }
-                  },
-                  "description": "Something in the request is missing or not valid."
+                  }
                 },
                 "example": {
                   "error": {
@@ -901,6 +905,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "No API key was sent, or the key is not valid.",
                   "required": [
                     "error"
                   ],
@@ -914,24 +919,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "unauthorized"
+                          ],
+                          "description": "Always:\n- `unauthorized`: no API key was sent, or it is wrong or revoked."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Missing or invalid API key."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "No API key was sent, or the key is not valid."
+                  }
                 },
                 "example": {
                   "error": {
@@ -1023,6 +1025,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "Something in the request is missing or not valid.",
                   "required": [
                     "error"
                   ],
@@ -1036,24 +1039,27 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "validation_error",
+                            "invalid_json"
+                          ],
+                          "description": "One of:\n- `validation_error`: a field is missing, has the wrong type or is out of range.\n- `invalid_json`: the body could not be read as JSON."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "body/amount must be integer"
+                          ]
                         },
                         "details": {
                           "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "additionalProperties": true,
+                          "description": "Extra context: issues lists each field that failed and why."
                         }
                       }
                     }
-                  },
-                  "description": "Something in the request is missing or not valid."
+                  }
                 },
                 "example": {
                   "error": {
@@ -1078,6 +1084,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "No API key was sent, or the key is not valid.",
                   "required": [
                     "error"
                   ],
@@ -1091,24 +1098,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "unauthorized"
+                          ],
+                          "description": "Always:\n- `unauthorized`: no API key was sent, or it is wrong or revoked."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Missing or invalid API key."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "No API key was sent, or the key is not valid."
+                  }
                 },
                 "example": {
                   "error": {
@@ -1285,6 +1289,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "No API key was sent, or the key is not valid.",
                   "required": [
                     "error"
                   ],
@@ -1298,24 +1303,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "unauthorized"
+                          ],
+                          "description": "Always:\n- `unauthorized`: no API key was sent, or it is wrong or revoked."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Missing or invalid API key."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "No API key was sent, or the key is not valid."
+                  }
                 },
                 "example": {
                   "error": {
@@ -1332,6 +1334,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "It doesn't exist, or it belongs to someone else.",
                   "required": [
                     "error"
                   ],
@@ -1345,24 +1348,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "not_found"
+                          ],
+                          "description": "Always:\n- `not_found`: it does not exist, or it belongs to another client."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Account not found."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "It doesn't exist, or it belongs to someone else."
+                  }
                 },
                 "example": {
                   "error": {
@@ -1467,6 +1467,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "Something in the request is missing or not valid.",
                   "required": [
                     "error"
                   ],
@@ -1480,24 +1481,27 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "validation_error",
+                            "invalid_json"
+                          ],
+                          "description": "One of:\n- `validation_error`: a field is missing, has the wrong type or is out of range.\n- `invalid_json`: the body could not be read as JSON."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "body/amount must be integer"
+                          ]
                         },
                         "details": {
                           "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "additionalProperties": true,
+                          "description": "Extra context: issues lists each field that failed and why."
                         }
                       }
                     }
-                  },
-                  "description": "Something in the request is missing or not valid."
+                  }
                 },
                 "example": {
                   "error": {
@@ -1522,6 +1526,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "No API key was sent, or the key is not valid.",
                   "required": [
                     "error"
                   ],
@@ -1535,24 +1540,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "unauthorized"
+                          ],
+                          "description": "Always:\n- `unauthorized`: no API key was sent, or it is wrong or revoked."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Missing or invalid API key."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "No API key was sent, or the key is not valid."
+                  }
                 },
                 "example": {
                   "error": {
@@ -1569,6 +1571,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "It doesn't exist, or it belongs to someone else.",
                   "required": [
                     "error"
                   ],
@@ -1582,24 +1585,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "not_found"
+                          ],
+                          "description": "Always:\n- `not_found`: it does not exist, or it belongs to another client."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Account not found."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "It doesn't exist, or it belongs to someone else."
+                  }
                 },
                 "example": {
                   "error": {
@@ -1813,6 +1813,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "Something in the request is missing or not valid.",
                   "required": [
                     "error"
                   ],
@@ -1826,24 +1827,28 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "validation_error",
+                            "idempotency_key_required",
+                            "invalid_json"
+                          ],
+                          "description": "One of:\n- `validation_error`: a field is missing, has the wrong type or is out of range.\n- `idempotency_key_required`: the Idempotency-Key header is missing or too short.\n- `invalid_json`: the body could not be read as JSON."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "body/amount must be integer"
+                          ]
                         },
                         "details": {
                           "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "additionalProperties": true,
+                          "description": "Extra context: issues lists each field that failed and why."
                         }
                       }
                     }
-                  },
-                  "description": "Something in the request is missing or not valid."
+                  }
                 },
                 "example": {
                   "error": {
@@ -1868,6 +1873,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "No API key was sent, or the key is not valid.",
                   "required": [
                     "error"
                   ],
@@ -1881,24 +1887,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "unauthorized"
+                          ],
+                          "description": "Always:\n- `unauthorized`: no API key was sent, or it is wrong or revoked."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Missing or invalid API key."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "No API key was sent, or the key is not valid."
+                  }
                 },
                 "example": {
                   "error": {
@@ -1915,6 +1918,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "It doesn't exist, or it belongs to someone else.",
                   "required": [
                     "error"
                   ],
@@ -1928,24 +1932,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "not_found"
+                          ],
+                          "description": "Always:\n- `not_found`: it does not exist, or it belongs to another client."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Account not found."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "It doesn't exist, or it belongs to someone else."
+                  }
                 },
                 "example": {
                   "error": {
@@ -1962,6 +1963,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "The same Idempotency-Key is still being processed. Wait a moment and retry.",
                   "required": [
                     "error"
                   ],
@@ -1975,24 +1977,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "request_in_progress"
+                          ],
+                          "description": "Always:\n- `request_in_progress`: the same Idempotency-Key arrives again while the first request is still running."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "A request with this Idempotency-Key is still being processed."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "The same Idempotency-Key is still being processed. Wait a moment and retry."
+                  }
                 },
                 "example": {
                   "error": {
@@ -2004,11 +2003,12 @@
             }
           },
           "422": {
-            "description": "The request was understood but breaks a money rule, such as not enough balance or mixed currencies.",
+            "description": "The request was understood but breaks a money rule.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "The request was understood but breaks a money rule.",
                   "required": [
                     "error"
                   ],
@@ -2022,24 +2022,30 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "insufficient_funds",
+                            "currency_mismatch",
+                            "same_account",
+                            "idempotency_key_reused",
+                            "constraint_violation"
+                          ],
+                          "description": "One of:\n- `insufficient_funds`: the wallet cannot cover the amount (plus the fee, for withdrawals).\n- `currency_mismatch`: the two wallets hold different currencies.\n- `same_account`: you try to send money to the same wallet.\n- `idempotency_key_reused`: a key you already used is sent again with a different body.\n- `constraint_violation`: a database safety check stopped the change (a last line of defence that should never trigger)."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "The account does not have enough available balance."
+                          ]
                         },
                         "details": {
                           "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "additionalProperties": true,
+                          "description": "Extra context. For insufficient_funds: account_id, available and required."
                         }
                       }
                     }
-                  },
-                  "description": "The request was understood but breaks a money rule, such as not enough balance or mixed currencies."
+                  }
                 },
                 "example": {
                   "error": {
@@ -2061,6 +2067,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "The wallet is frozen, so money cannot leave it.",
                   "required": [
                     "error"
                   ],
@@ -2074,24 +2081,26 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "account_frozen"
+                          ],
+                          "description": "Always:\n- `account_frozen`: money would leave a frozen wallet."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "The account is frozen and cannot be debited."
+                          ]
                         },
                         "details": {
                           "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "additionalProperties": true,
+                          "description": "Extra context: the account_id of the frozen wallet."
                         }
                       }
                     }
-                  },
-                  "description": "The wallet is frozen, so money cannot leave it."
+                  }
                 },
                 "example": {
                   "error": {
@@ -2262,6 +2271,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "No API key was sent, or the key is not valid.",
                   "required": [
                     "error"
                   ],
@@ -2275,24 +2285,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "unauthorized"
+                          ],
+                          "description": "Always:\n- `unauthorized`: no API key was sent, or it is wrong or revoked."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Missing or invalid API key."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "No API key was sent, or the key is not valid."
+                  }
                 },
                 "example": {
                   "error": {
@@ -2309,6 +2316,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "It doesn't exist, or it belongs to someone else.",
                   "required": [
                     "error"
                   ],
@@ -2322,24 +2330,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "not_found"
+                          ],
+                          "description": "Always:\n- `not_found`: it does not exist, or it belongs to another client."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Transfer not found."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "It doesn't exist, or it belongs to someone else."
+                  }
                 },
                 "example": {
                   "error": {
@@ -2658,6 +2663,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "Something in the request is missing or not valid.",
                   "required": [
                     "error"
                   ],
@@ -2671,24 +2677,28 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "validation_error",
+                            "idempotency_key_required",
+                            "invalid_json"
+                          ],
+                          "description": "One of:\n- `validation_error`: a field is missing, has the wrong type or is out of range.\n- `idempotency_key_required`: the Idempotency-Key header is missing or too short.\n- `invalid_json`: the body could not be read as JSON."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "body/amount must be integer"
+                          ]
                         },
                         "details": {
                           "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "additionalProperties": true,
+                          "description": "Extra context: issues lists each field that failed and why."
                         }
                       }
                     }
-                  },
-                  "description": "Something in the request is missing or not valid."
+                  }
                 },
                 "example": {
                   "error": {
@@ -2713,6 +2723,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "No API key was sent, or the key is not valid.",
                   "required": [
                     "error"
                   ],
@@ -2726,24 +2737,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "unauthorized"
+                          ],
+                          "description": "Always:\n- `unauthorized`: no API key was sent, or it is wrong or revoked."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Missing or invalid API key."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "No API key was sent, or the key is not valid."
+                  }
                 },
                 "example": {
                   "error": {
@@ -2760,6 +2768,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "It doesn't exist, or it belongs to someone else.",
                   "required": [
                     "error"
                   ],
@@ -2773,24 +2782,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "not_found"
+                          ],
+                          "description": "Always:\n- `not_found`: it does not exist, or it belongs to another client."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Account not found."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "It doesn't exist, or it belongs to someone else."
+                  }
                 },
                 "example": {
                   "error": {
@@ -2807,6 +2813,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "The same Idempotency-Key is still being processed. Wait a moment and retry.",
                   "required": [
                     "error"
                   ],
@@ -2820,24 +2827,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "request_in_progress"
+                          ],
+                          "description": "Always:\n- `request_in_progress`: the same Idempotency-Key arrives again while the first request is still running."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "A request with this Idempotency-Key is still being processed."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "The same Idempotency-Key is still being processed. Wait a moment and retry."
+                  }
                 },
                 "example": {
                   "error": {
@@ -2849,11 +2853,12 @@
             }
           },
           "422": {
-            "description": "The request was understood but breaks a money rule, such as not enough balance or mixed currencies.",
+            "description": "The request was understood but breaks a money rule.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "The request was understood but breaks a money rule.",
                   "required": [
                     "error"
                   ],
@@ -2867,24 +2872,28 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "insufficient_funds",
+                            "idempotency_key_reused",
+                            "constraint_violation"
+                          ],
+                          "description": "One of:\n- `insufficient_funds`: the wallet cannot cover the amount (plus the fee, for withdrawals).\n- `idempotency_key_reused`: a key you already used is sent again with a different body.\n- `constraint_violation`: a database safety check stopped the change (a last line of defence that should never trigger)."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "The account does not have enough available balance."
+                          ]
                         },
                         "details": {
                           "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "additionalProperties": true,
+                          "description": "Extra context. For insufficient_funds: account_id, available and required."
                         }
                       }
                     }
-                  },
-                  "description": "The request was understood but breaks a money rule, such as not enough balance or mixed currencies."
+                  }
                 },
                 "example": {
                   "error": {
@@ -2906,6 +2915,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "The wallet is frozen, so money cannot leave it.",
                   "required": [
                     "error"
                   ],
@@ -2919,24 +2929,26 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "account_frozen"
+                          ],
+                          "description": "Always:\n- `account_frozen`: money would leave a frozen wallet."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "The account is frozen and cannot be debited."
+                          ]
                         },
                         "details": {
                           "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "additionalProperties": true,
+                          "description": "Extra context: the account_id of the frozen wallet."
                         }
                       }
                     }
-                  },
-                  "description": "The wallet is frozen, so money cannot leave it."
+                  }
                 },
                 "example": {
                   "error": {
@@ -3189,6 +3201,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "No API key was sent, or the key is not valid.",
                   "required": [
                     "error"
                   ],
@@ -3202,24 +3215,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "unauthorized"
+                          ],
+                          "description": "Always:\n- `unauthorized`: no API key was sent, or it is wrong or revoked."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Missing or invalid API key."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "No API key was sent, or the key is not valid."
+                  }
                 },
                 "example": {
                   "error": {
@@ -3236,6 +3246,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "It doesn't exist, or it belongs to someone else.",
                   "required": [
                     "error"
                   ],
@@ -3249,24 +3260,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "not_found"
+                          ],
+                          "description": "Always:\n- `not_found`: it does not exist, or it belongs to another client."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Withdrawal not found."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "It doesn't exist, or it belongs to someone else."
+                  }
                 },
                 "example": {
                   "error": {
@@ -3362,6 +3370,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "Something in the request is missing or not valid.",
                   "required": [
                     "error"
                   ],
@@ -3375,24 +3384,27 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "validation_error",
+                            "invalid_json"
+                          ],
+                          "description": "One of:\n- `validation_error`: a field is missing, has the wrong type or is out of range.\n- `invalid_json`: the body could not be read as JSON."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "body/amount must be integer"
+                          ]
                         },
                         "details": {
                           "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "additionalProperties": true,
+                          "description": "Extra context: issues lists each field that failed and why."
                         }
                       }
                     }
-                  },
-                  "description": "Something in the request is missing or not valid."
+                  }
                 },
                 "example": {
                   "error": {
@@ -3417,6 +3429,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "No API key was sent, or the key is not valid.",
                   "required": [
                     "error"
                   ],
@@ -3430,24 +3443,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "unauthorized"
+                          ],
+                          "description": "Always:\n- `unauthorized`: no API key was sent, or it is wrong or revoked."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Missing or invalid API key."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "No API key was sent, or the key is not valid."
+                  }
                 },
                 "example": {
                   "error": {
@@ -3464,6 +3474,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "Your key is valid but cannot do this. Admin actions need an admin key.",
                   "required": [
                     "error"
                   ],
@@ -3477,24 +3488,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "forbidden"
+                          ],
+                          "description": "Always:\n- `forbidden`: a client key tries an admin action."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "This API key is not allowed to perform this action."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "Your key is valid but cannot do this. Admin actions need an admin key."
+                  }
                 },
                 "example": {
                   "error": {
@@ -3765,6 +3773,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "No API key was sent, or the key is not valid.",
                   "required": [
                     "error"
                   ],
@@ -3778,24 +3787,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "unauthorized"
+                          ],
+                          "description": "Always:\n- `unauthorized`: no API key was sent, or it is wrong or revoked."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Missing or invalid API key."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "No API key was sent, or the key is not valid."
+                  }
                 },
                 "example": {
                   "error": {
@@ -3812,6 +3818,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "Your key is valid but cannot do this. Admin actions need an admin key.",
                   "required": [
                     "error"
                   ],
@@ -3825,24 +3832,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "forbidden"
+                          ],
+                          "description": "Always:\n- `forbidden`: a client key tries an admin action."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "This API key is not allowed to perform this action."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "Your key is valid but cannot do this. Admin actions need an admin key."
+                  }
                 },
                 "example": {
                   "error": {
@@ -3859,6 +3863,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "It doesn't exist, or it belongs to someone else.",
                   "required": [
                     "error"
                   ],
@@ -3872,24 +3877,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "not_found"
+                          ],
+                          "description": "Always:\n- `not_found`: it does not exist, or it belongs to another client."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Withdrawal not found."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "It doesn't exist, or it belongs to someone else."
+                  }
                 },
                 "example": {
                   "error": {
@@ -3906,6 +3908,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "This withdrawal was already approved or rejected.",
                   "required": [
                     "error"
                   ],
@@ -3919,24 +3922,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "invalid_state"
+                          ],
+                          "description": "Always:\n- `invalid_state`: the withdrawal was already approved or rejected."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Withdrawal is already completed."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "This withdrawal was already approved or rejected."
+                  }
                 },
                 "example": {
                   "error": {
@@ -4207,6 +4207,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "No API key was sent, or the key is not valid.",
                   "required": [
                     "error"
                   ],
@@ -4220,24 +4221,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "unauthorized"
+                          ],
+                          "description": "Always:\n- `unauthorized`: no API key was sent, or it is wrong or revoked."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Missing or invalid API key."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "No API key was sent, or the key is not valid."
+                  }
                 },
                 "example": {
                   "error": {
@@ -4254,6 +4252,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "Your key is valid but cannot do this. Admin actions need an admin key.",
                   "required": [
                     "error"
                   ],
@@ -4267,24 +4266,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "forbidden"
+                          ],
+                          "description": "Always:\n- `forbidden`: a client key tries an admin action."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "This API key is not allowed to perform this action."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "Your key is valid but cannot do this. Admin actions need an admin key."
+                  }
                 },
                 "example": {
                   "error": {
@@ -4301,6 +4297,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "It doesn't exist, or it belongs to someone else.",
                   "required": [
                     "error"
                   ],
@@ -4314,24 +4311,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "not_found"
+                          ],
+                          "description": "Always:\n- `not_found`: it does not exist, or it belongs to another client."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Withdrawal not found."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "It doesn't exist, or it belongs to someone else."
+                  }
                 },
                 "example": {
                   "error": {
@@ -4348,6 +4342,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "This withdrawal was already approved or rejected.",
                   "required": [
                     "error"
                   ],
@@ -4361,24 +4356,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "invalid_state"
+                          ],
+                          "description": "Always:\n- `invalid_state`: the withdrawal was already approved or rejected."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Withdrawal is already completed."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "This withdrawal was already approved or rejected."
+                  }
                 },
                 "example": {
                   "error": {
@@ -4591,6 +4583,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "Something in the request is missing or not valid.",
                   "required": [
                     "error"
                   ],
@@ -4604,24 +4597,27 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "validation_error",
+                            "invalid_json"
+                          ],
+                          "description": "One of:\n- `validation_error`: a field is missing, has the wrong type or is out of range.\n- `invalid_json`: the body could not be read as JSON."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "body/amount must be integer"
+                          ]
                         },
                         "details": {
                           "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "additionalProperties": true,
+                          "description": "Extra context: issues lists each field that failed and why."
                         }
                       }
                     }
-                  },
-                  "description": "Something in the request is missing or not valid."
+                  }
                 },
                 "example": {
                   "error": {
@@ -4646,6 +4642,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "The signature is missing, wrong or too old.",
                   "required": [
                     "error"
                   ],
@@ -4659,24 +4656,22 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "invalid_signature",
+                            "signature_expired"
+                          ],
+                          "description": "One of:\n- `invalid_signature`: the signature is missing or does not match the body.\n- `signature_expired`: the signed timestamp is more than 5 minutes old."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Webhook signature does not match."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "The signature is missing, wrong or too old."
+                  }
                 },
                 "example": {
                   "error": {
@@ -4826,6 +4821,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "No API key was sent, or the key is not valid.",
                   "required": [
                     "error"
                   ],
@@ -4839,24 +4835,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "unauthorized"
+                          ],
+                          "description": "Always:\n- `unauthorized`: no API key was sent, or it is wrong or revoked."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Missing or invalid API key."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "No API key was sent, or the key is not valid."
+                  }
                 },
                 "example": {
                   "error": {
@@ -4873,6 +4866,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "Your key is valid but cannot do this. Admin actions need an admin key.",
                   "required": [
                     "error"
                   ],
@@ -4886,24 +4880,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "forbidden"
+                          ],
+                          "description": "Always:\n- `forbidden`: a client key tries an admin action."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "This API key is not allowed to perform this action."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "Your key is valid but cannot do this. Admin actions need an admin key."
+                  }
                 },
                 "example": {
                   "error": {
@@ -5056,6 +5047,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "Something in the request is missing or not valid.",
                   "required": [
                     "error"
                   ],
@@ -5069,24 +5061,27 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "validation_error",
+                            "invalid_json"
+                          ],
+                          "description": "One of:\n- `validation_error`: a field is missing, has the wrong type or is out of range.\n- `invalid_json`: the body could not be read as JSON."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "body/amount must be integer"
+                          ]
                         },
                         "details": {
                           "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "additionalProperties": true,
+                          "description": "Extra context: issues lists each field that failed and why."
                         }
                       }
                     }
-                  },
-                  "description": "Something in the request is missing or not valid."
+                  }
                 },
                 "example": {
                   "error": {
@@ -5111,6 +5106,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "No API key was sent, or the key is not valid.",
                   "required": [
                     "error"
                   ],
@@ -5124,24 +5120,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "unauthorized"
+                          ],
+                          "description": "Always:\n- `unauthorized`: no API key was sent, or it is wrong or revoked."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Missing or invalid API key."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "No API key was sent, or the key is not valid."
+                  }
                 },
                 "example": {
                   "error": {
@@ -5158,6 +5151,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "Your key is valid but cannot do this. Admin actions need an admin key.",
                   "required": [
                     "error"
                   ],
@@ -5171,24 +5165,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "forbidden"
+                          ],
+                          "description": "Always:\n- `forbidden`: a client key tries an admin action."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "This API key is not allowed to perform this action."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "Your key is valid but cannot do this. Admin actions need an admin key."
+                  }
                 },
                 "example": {
                   "error": {
@@ -5386,6 +5377,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "No API key was sent, or the key is not valid.",
                   "required": [
                     "error"
                   ],
@@ -5399,24 +5391,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "unauthorized"
+                          ],
+                          "description": "Always:\n- `unauthorized`: no API key was sent, or it is wrong or revoked."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Missing or invalid API key."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "No API key was sent, or the key is not valid."
+                  }
                 },
                 "example": {
                   "error": {
@@ -5433,6 +5422,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "Your key is valid but cannot do this. Admin actions need an admin key.",
                   "required": [
                     "error"
                   ],
@@ -5446,24 +5436,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "forbidden"
+                          ],
+                          "description": "Always:\n- `forbidden`: a client key tries an admin action."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "This API key is not allowed to perform this action."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "Your key is valid but cannot do this. Admin actions need an admin key."
+                  }
                 },
                 "example": {
                   "error": {
@@ -5480,6 +5467,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "It doesn't exist, or it belongs to someone else.",
                   "required": [
                     "error"
                   ],
@@ -5493,24 +5481,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "not_found"
+                          ],
+                          "description": "Always:\n- `not_found`: it does not exist, or it belongs to another client."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Account not found."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "It doesn't exist, or it belongs to someone else."
+                  }
                 },
                 "example": {
                   "error": {
@@ -5708,6 +5693,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "No API key was sent, or the key is not valid.",
                   "required": [
                     "error"
                   ],
@@ -5721,24 +5707,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "unauthorized"
+                          ],
+                          "description": "Always:\n- `unauthorized`: no API key was sent, or it is wrong or revoked."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Missing or invalid API key."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "No API key was sent, or the key is not valid."
+                  }
                 },
                 "example": {
                   "error": {
@@ -5755,6 +5738,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "Your key is valid but cannot do this. Admin actions need an admin key.",
                   "required": [
                     "error"
                   ],
@@ -5768,24 +5752,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "forbidden"
+                          ],
+                          "description": "Always:\n- `forbidden`: a client key tries an admin action."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "This API key is not allowed to perform this action."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "Your key is valid but cannot do this. Admin actions need an admin key."
+                  }
                 },
                 "example": {
                   "error": {
@@ -5802,6 +5783,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "It doesn't exist, or it belongs to someone else.",
                   "required": [
                     "error"
                   ],
@@ -5815,24 +5797,21 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "description": "Stable, machine-readable reason. Check this in your app.",
-                          "examples": [
-                            "insufficient_funds"
-                          ]
+                          "enum": [
+                            "not_found"
+                          ],
+                          "description": "Always:\n- `not_found`: it does not exist, or it belongs to another client."
                         },
                         "message": {
                           "type": "string",
-                          "description": "A human-readable explanation."
-                        },
-                        "details": {
-                          "type": "object",
-                          "description": "Extra context when it helps, for example the available and required amounts.",
-                          "additionalProperties": {}
+                          "description": "A human-readable explanation.",
+                          "examples": [
+                            "Account not found."
+                          ]
                         }
                       }
                     }
-                  },
-                  "description": "It doesn't exist, or it belongs to someone else."
+                  }
                 },
                 "example": {
                   "error": {

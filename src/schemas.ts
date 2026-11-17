@@ -23,7 +23,10 @@ export const MinorAmount = Type.Integer({
 export const ErrorResponse = Type.Object(
   {
     error: Type.Object({
-      code: Type.String({ description: 'Stable, machine-readable reason. Check this in your app.', examples: ['insufficient_funds'] }),
+      code: Type.String({
+        description: 'Stable, machine-readable reason. Check this in your app. Each response lists the codes it can return.',
+        examples: ['not_found'],
+      }),
       message: Type.String({ description: 'A human-readable explanation.' }),
       details: Type.Optional(
         Type.Record(Type.String(), Type.Unknown(), {
@@ -162,63 +165,117 @@ const withoutId = <T extends TSchema>(schema: T): T => {
 export const ok = (schema: TSchema, description: string): TUnknown =>
   ({ ...withoutId(schema), description }) as unknown as TUnknown;
 
-type ErrorExample = { description: string; code: string; message: string; details?: Record<string, unknown> };
-
-const ERROR_EXAMPLES: Record<number, ErrorExample> = {
-  400: {
-    description: 'Something in the request is missing or not valid.',
-    code: 'validation_error',
+/** Every error code the API can return, with the message it sends and when it happens. */
+const ERROR_CODES: Record<string, { message: string; when: string; details?: Record<string, unknown> }> = {
+  validation_error: {
     message: 'body/amount must be integer',
+    when: 'a field is missing, has the wrong type or is out of range',
     details: { issues: [{ instancePath: '/amount', message: 'must be integer' }] },
   },
-  401: { description: 'No API key was sent, or the key is not valid.', code: 'unauthorized', message: 'Missing or invalid API key.' },
-  403: {
-    description: 'Your key is valid but cannot do this. Admin actions need an admin key.',
-    code: 'forbidden',
-    message: 'This API key is not allowed to perform this action.',
+  invalid_json: { message: 'Request body is not valid JSON.', when: 'the body could not be read as JSON' },
+  idempotency_key_required: {
+    message: 'Send a unique Idempotency-Key header (8 to 255 characters) with every money-moving request.',
+    when: 'the Idempotency-Key header is missing or too short',
   },
-  404: {
-    description: "It doesn't exist, or it belongs to someone else.",
-    code: 'not_found',
-    message: 'Account not found.',
+  unauthorized: { message: 'Missing or invalid API key.', when: 'no API key was sent, or it is wrong or revoked' },
+  invalid_signature: { message: 'Webhook signature does not match.', when: 'the signature is missing or does not match the body' },
+  signature_expired: {
+    message: 'Webhook timestamp is outside the allowed tolerance (possible replay).',
+    when: 'the signed timestamp is more than 5 minutes old',
   },
-  409: {
-    description: 'The same Idempotency-Key is still being processed. Wait a moment and retry.',
-    code: 'request_in_progress',
+  forbidden: { message: 'This API key is not allowed to perform this action.', when: 'a client key tries an admin action' },
+  not_found: { message: 'Account not found.', when: "it does not exist, or it belongs to another client" },
+  request_in_progress: {
     message: 'A request with this Idempotency-Key is still being processed.',
+    when: 'the same Idempotency-Key arrives again while the first request is still running',
   },
-  422: {
-    description: 'The request was understood but breaks a money rule, such as not enough balance or mixed currencies.',
-    code: 'insufficient_funds',
+  invalid_state: { message: 'Withdrawal is already completed.', when: 'the withdrawal was already approved or rejected' },
+  insufficient_funds: {
     message: 'The account does not have enough available balance.',
+    when: 'the wallet cannot cover the amount (plus the fee, for withdrawals)',
     details: { account_id: PLACEHOLDER_ID, available: 100000, required: 150000 },
   },
-  423: {
-    description: 'The wallet is frozen, so money cannot leave it.',
-    code: 'account_frozen',
+  currency_mismatch: {
+    message: 'All accounts in a transaction must use the same currency.',
+    when: 'the two wallets hold different currencies',
+  },
+  same_account: { message: 'Source and destination accounts must be different.', when: 'you try to send money to the same wallet' },
+  idempotency_key_reused: {
+    message: 'This Idempotency-Key was already used with a different request.',
+    when: 'a key you already used is sent again with a different body',
+  },
+  constraint_violation: {
+    message: 'The operation violates a ledger rule.',
+    when: 'a database safety check stopped the change (a last line of defence that should never trigger)',
+  },
+  account_frozen: {
     message: 'The account is frozen and cannot be debited.',
+    when: 'money would leave a frozen wallet',
     details: { account_id: PLACEHOLDER_ID },
   },
-  429: {
-    description: 'Too many requests in a short time. Wait and try again.',
-    code: 'rate_limited',
-    message: 'Too many requests. Retry after 42s.',
-  },
+  rate_limited: { message: 'Too many requests. Retry after 42s.', when: 'too many requests were sent in a short time' },
 };
 
+type StatusInfo = { description: string; codes: string[] };
+
+const STATUS_DEFAULTS: Record<number, StatusInfo> = {
+  400: { description: 'Something in the request is missing or not valid.', codes: ['validation_error', 'invalid_json'] },
+  401: { description: 'No API key was sent, or the key is not valid.', codes: ['unauthorized'] },
+  403: { description: 'Your key is valid but cannot do this. Admin actions need an admin key.', codes: ['forbidden'] },
+  404: { description: "It doesn't exist, or it belongs to someone else.", codes: ['not_found'] },
+  409: { description: 'The same Idempotency-Key is still being processed. Wait a moment and retry.', codes: ['request_in_progress'] },
+  422: {
+    description: 'The request was understood but breaks a money rule.',
+    codes: ['insufficient_funds', 'currency_mismatch'],
+  },
+  423: { description: 'The wallet is frozen, so money cannot leave it.', codes: ['account_frozen'] },
+  429: { description: 'Too many requests in a short time. Wait and try again.', codes: ['rate_limited'] },
+};
+
+type ErrorOverride = { description?: string; codes?: string[]; message?: string };
+
 /**
- * Error responses for a route, each with a plain-English description and a realistic example,
- * so Swagger shows real errors instead of generated filler.
+ * Error responses for a route. Each status gets a plain-English description, the exact list of
+ * codes it can carry (with when each happens) and a realistic example, so the Schema and Example
+ * tabs in Swagger always match the status they sit under.
  */
-export function errors(statuses: number[], overrides: Record<number, Partial<ErrorExample>> = {}) {
+export function errors(statuses: number[], overrides: Record<number, ErrorOverride> = {}) {
   const out: Record<number, TSchema> = {};
   for (const status of statuses) {
-    const e = { ...ERROR_EXAMPLES[status]!, ...overrides[status] };
+    const info = { ...STATUS_DEFAULTS[status]!, ...overrides[status] };
+    const first = ERROR_CODES[info.codes[0]!]!;
+    const message = overrides[status]?.message ?? first.message;
+    const detailsNote = info.codes.includes('insufficient_funds')
+      ? 'Extra context. For insufficient_funds: account_id, available and required.'
+      : info.codes.includes('account_frozen')
+        ? 'Extra context: the account_id of the frozen wallet.'
+        : info.codes.includes('validation_error')
+          ? 'Extra context: issues lists each field that failed and why.'
+          : undefined;
+    const codeList = info.codes.map((c) => `\`${c}\`: ${ERROR_CODES[c]!.when}.`).join('\n- ');
     out[status] = {
-      ...withoutId(ErrorResponse),
-      description: e.description,
-      examples: [{ error: { code: e.code, message: e.message, ...(e.details ? { details: e.details } : {}) } }],
-    } as TSchema;
+      type: 'object',
+      description: info.description,
+      required: ['error'],
+      properties: {
+        error: {
+          type: 'object',
+          required: ['code', 'message'],
+          properties: {
+            code: {
+              type: 'string',
+              enum: info.codes,
+              description: (info.codes.length > 1 ? 'One of:\n- ' : 'Always:\n- ') + codeList,
+            },
+            message: { type: 'string', description: 'A human-readable explanation.', examples: [message] },
+            ...(detailsNote
+              ? { details: { type: 'object', additionalProperties: true, description: detailsNote } }
+              : {}),
+          },
+        },
+      },
+      examples: [{ error: { code: info.codes[0], message, ...(first.details ? { details: first.details } : {}) } }],
+    } as unknown as TSchema;
   }
   return out;
 }

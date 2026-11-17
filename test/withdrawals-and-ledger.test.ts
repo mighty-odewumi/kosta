@@ -196,5 +196,19 @@ describe('API documentation', () => {
     expect(transfer['201'].description).toBe('Done. The money has moved.');
     expect(transfer['422'].content['application/json'].example.error.code).toBe('insufficient_funds');
     expect(JSON.stringify(spec)).not.toContain('Default Response');
+
+    // Each error lists only the codes that status can return, and its example uses one of them.
+    expect(transfer['401'].content['application/json'].schema.properties.error.properties.code.enum).toEqual(['unauthorized']);
+    expect(transfer['422'].content['application/json'].schema.properties.error.properties.code.enum).toContain('same_account');
+    for (const [path, ops] of Object.entries<Record<string, { responses: Record<string, any> }>>(spec.paths)) {
+      for (const op of Object.values(ops)) {
+        for (const [status, res] of Object.entries(op.responses)) {
+          if (Number(status) < 400) continue;
+          const media = res.content['application/json'];
+          const allowed = media.schema.properties.error.properties.code.enum;
+          expect(allowed, `${path} ${status}`).toContain(media.example.error.code);
+        }
+      }
+    }
   });
 });

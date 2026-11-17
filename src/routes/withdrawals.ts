@@ -42,7 +42,10 @@ export default async function withdrawalRoutes(app: FastifyInstance) {
         ),
         response: {
           201: ok(Withdrawal, 'Request received. The money is on hold until an admin reviews it.'),
-          ...errors([400, 401, 404, 409, 422, 423]),
+          ...errors([400, 401, 404, 409, 422, 423], {
+            400: { codes: ['validation_error', 'idempotency_key_required', 'invalid_json'] },
+            422: { codes: ['insufficient_funds', 'idempotency_key_reused', 'constraint_violation'] },
+          }),
         },
       },
     },
@@ -163,11 +166,7 @@ export default async function withdrawalRoutes(app: FastifyInstance) {
             200: ok(Withdrawal, decision === 'approve' ? 'Approved and paid out.' : 'Rejected. The money is back in the wallet.'),
             ...errors([401, 403, 404, 409], {
               404: { message: 'Withdrawal not found.' },
-              409: {
-                description: 'This withdrawal was already approved or rejected.',
-                code: 'invalid_state',
-                message: 'Withdrawal is already completed.',
-              },
+              409: { description: 'This withdrawal was already approved or rejected.', codes: ['invalid_state'] },
             }),
           },
         },
