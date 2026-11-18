@@ -35,10 +35,6 @@ Kosta is a payments backend for wallet apps. It keeps a proper ledger of every n
 **Signing in**
 
 Send your API key as \`Authorization: Bearer <key>\`. Client keys only see the wallets they opened. Admin keys can also review withdrawals, freeze wallets, read the activity log and run the books check.
-
-**When something goes wrong**
-
-Errors always look like \`{ "error": { "code": "...", "message": "..." } }\`, sometimes with extra \`details\`. Check \`code\` in your app; the message is written for people.
 `.trim();
 
 export async function buildApp(opts: FastifyServerOptions = {}) {

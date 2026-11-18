@@ -10,78 +10,29 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <style>
   body { margin: 0; background: #fafafa; }
-  .hero { background: #0f172a; color: #e2e8f0; padding: 28px 20px 24px; font-family: Inter, -apple-system, "Segoe UI", sans-serif; }
-  .wrap { max-width: 1460px; margin: 0 auto; }
-  .hero h1 { margin: 0 0 6px; font-size: 26px; color: #fff; letter-spacing: -0.01em; }
-  .hero p { margin: 0 0 14px; color: #94a3b8; font-size: 15px; max-width: 780px; line-height: 1.55; }
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-  .chip { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: #1e293b; color: #cbd5e1; border: 1px solid #334155; }
-  .panel { margin-top: 18px; background: #111c33; border: 1px solid #1f2b44; border-radius: 12px; padding: 16px; font-size: 14px; color: #cbd5e1; line-height: 1.55; }
-  .panel h2 { margin: 0 0 4px; font-size: 15px; color: #fff; }
-  .panel p { margin: 0 0 12px; font-size: 14px; color: #94a3b8; }
-  .panel code { background: #1e293b; padding: 1px 5px; border-radius: 4px; color: #a5f3fc; font-size: 12.5px; }
-  .btn { background: #14b8a6; color: #04201d; border: 0; border-radius: 8px; padding: 10px 16px; font: 600 14px Inter, sans-serif; cursor: pointer; }
+  .bar { background: #0f172a; color: #cbd5e1; font: 14px Inter, -apple-system, "Segoe UI", sans-serif; padding: 12px 20px; position: sticky; top: 0; z-index: 10; }
+  .wrap { max-width: 1460px; margin: 0 auto; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .btn { background: #14b8a6; color: #04201d; border: 0; border-radius: 8px; padding: 8px 14px; font: 600 14px Inter, sans-serif; cursor: pointer; }
   .btn:disabled { opacity: .6; cursor: progress; }
-  .link-btn { background: none; border: 0; color: #5eead4; font: 500 13px Inter, sans-serif; cursor: pointer; padding: 0; margin-left: 12px; }
-  .status { margin-top: 10px; font-size: 13px; color: #94a3b8; min-height: 18px; }
+  .status { color: #94a3b8; }
   .status.err { color: #fca5a5; }
   .session { display: none; }
-  .session.on { display: block; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; margin: 10px 0 12px; }
-  .card { background: #0b1324; border: 1px solid #1f2b44; border-radius: 10px; padding: 10px 12px; }
-  .card b { display: block; color: #fff; font-size: 13px; margin-bottom: 2px; }
-  .card span { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: #a5f3fc; word-break: break-all; }
-  .card small { display: block; color: #94a3b8; margin-top: 2px; }
-  .next { margin: 0; padding-left: 18px; color: #cbd5e1; }
-  .next li { margin: 2px 0; }
-  .links { margin-top: 14px; font-size: 13px; }
-  .links a { color: #5eead4; text-decoration: none; margin-right: 16px; }
+  .session.on { display: inline; }
+  .link-btn { background: none; border: 0; color: #5eead4; font: 500 14px Inter, sans-serif; cursor: pointer; padding: 0; margin-left: 6px; }
+  .links { margin-left: auto; }
+  .links a { color: #5eead4; text-decoration: none; }
   .swagger-ui .topbar { display: none; }
   .swagger-ui .info { margin: 30px 0 20px; }
 </style>
 </head>
 <body>
-  <header class="hero">
+  <header class="bar">
     <div class="wrap">
-      <h1>Kosta API</h1>
-      <p>A payments backend for wallet apps: wallets, transfers, bank withdrawals with review, and deposits from payment providers. It keeps a proper ledger, so balances are always right and money can never be spent twice.</p>
-      <div class="chips">
-        <span class="chip">Node.js 22</span><span class="chip">TypeScript</span><span class="chip">Fastify 5</span>
-        <span class="chip">PostgreSQL 16</span><span class="chip">OpenAPI 3.1</span><span class="chip">38 integration tests</span><span class="chip">Docker</span><span class="chip">CI</span>
-      </div>
-
-      <div class="panel" id="start">
-        <h2>Try it in one click</h2>
-        <p>This makes you a test key, signs this page in with it, and opens two test wallets with money in the first one. Nothing to copy or paste. All money here is pretend.</p>
-        <button class="btn" id="startBtn" type="button">Start a sandbox session</button>
-        <div class="status" id="status"></div>
-      </div>
-
-      <div class="panel session" id="session">
-        <h2>You're signed in <button class="link-btn" id="resetBtn" type="button">Start over</button></h2>
-        <div class="grid">
-          <div class="card"><b>Wallet A</b><span id="walletA"></span><small id="walletABal"></small></div>
-          <div class="card"><b>Wallet B</b><span id="walletB"></span><small id="walletBBal"></small></div>
-        </div>
-        <p>Every request below fills in these wallet ids for you, and a fresh Idempotency-Key is made each time you press Execute. Things to try:</p>
-        <ol class="next">
-          <li><b>Transfers</b> &gt; Send money to another wallet &gt; Execute. Then check Wallet A again.</li>
-          <li>Set the amount higher than the balance to see <code>insufficient_funds</code>.</li>
-          <li>Type your own Idempotency-Key and press Execute twice: the second answer is a replay and no extra money moves.</li>
-          <li><b>Withdrawals</b> &gt; Withdraw to a bank account, then <b>Admin</b> &gt; Approve a withdrawal.</li>
-          <li><b>Admin</b> &gt; Check the books balance.</li>
-        </ol>
-      </div>
-
-      <div class="panel" id="local" style="display:none">
-        <h2>Run it locally</h2>
-        <p style="margin:0"><code>docker compose up</code>, then <code>npx tsx scripts/seed.ts</code> for API keys. Requests on this page go to <code>http://localhost:3000</code>.</p>
-      </div>
-
-      <div class="links">
-        <a href="openapi.json">OpenAPI 3.1 spec (JSON)</a>
-        <a href="https://github.com/mighty-odewumi/kosta">Source code and tests</a>
-      </div>
+      <button class="btn" id="startBtn" type="button">Try it live</button>
+      <span class="status" id="status"></span>
+      <span class="session" id="session">Signed in with test wallets. Press Execute on any endpoint. <button class="link-btn" id="resetBtn" type="button">Reset</button></span>
+      <span class="local" id="local" style="display:none">Running locally: requests go to http://localhost:3000.</span>
+      <span class="links"><a href="https://github.com/mighty-odewumi/kosta">Source code</a></span>
     </div>
   </header>
   <div id="swagger-ui"></div>
@@ -100,7 +51,6 @@
       if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
       return 'k-' + Date.now().toString(16) + '-' + Math.random().toString(16).slice(2);
     }
-    function money(minor) { return 'NGN ' + (minor / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 }); }
     function $(id) { return document.getElementById(id); }
 
     function setStatus(text, isError) {
@@ -111,13 +61,9 @@
 
     function render() {
       var on = !!(state.key && state.walletA);
-      $('session').className = 'panel session' + (on ? ' on' : '');
-      $('start').style.display = on ? 'none' : '';
-      if (!on) return;
-      $('walletA').textContent = state.walletA;
-      $('walletB').textContent = state.walletB || 'Open another wallet to set this';
-      $('walletABal').textContent = state.balanceA != null ? 'Balance after setup: ' + money(state.balanceA) : '';
-      $('walletBBal').textContent = state.walletB ? 'Receives your test transfers' : '';
+      $('session').className = 'session' + (on ? ' on' : '');
+      $('startBtn').style.display = on ? 'none' : '';
+      if (on) setStatus('');
     }
 
     function authorize(key) {
@@ -147,16 +93,16 @@
       btn.disabled = true;
       setStatus('Connecting...');
       var slow = setTimeout(function () {
-        setStatus('Waking up the server. On the free plan this can take about 30 seconds the first time...');
+        setStatus('Waking the server, this can take about 30 seconds...');
       }, 4000);
       state = {};
       call('POST', '/sandbox/api-keys', { role: 'admin', name: 'docs-visitor' })
-        .then(function (res) { clearTimeout(slow); authorize(res.api_key); setStatus('Opening two wallets...'); })
+        .then(function (res) { clearTimeout(slow); authorize(res.api_key); setStatus('Setting up...'); })
         .then(function () { return call('POST', '/v1/accounts', { currency: 'NGN', label: "Ada's wallet" }); })
         .then(function (a) { state.walletA = a.id; return call('POST', '/v1/accounts', { currency: 'NGN', label: "Tunde's wallet" }); })
-        .then(function (b) { state.walletB = b.id; setStatus('Adding NGN 5,000.00 of test money...'); return call('POST', '/sandbox/deposits', { account_id: state.walletA, amount: 500000 }); })
+        .then(function (b) { state.walletB = b.id; setStatus('Setting up...'); return call('POST', '/sandbox/deposits', { account_id: state.walletA, amount: 500000 }); })
         .then(function (d) { state.balanceA = d.balance; save(); render(); setStatus(''); })
-        .catch(function (e) { clearTimeout(slow); setStatus('Could not start the session: ' + e.message, true); })
+        .catch(function (e) { clearTimeout(slow); setStatus('Could not start: ' + e.message, true); })
         .then(function () { btn.disabled = false; });
     }
 
@@ -220,7 +166,7 @@
       var hasSandbox = (spec.tags || []).some(function (t) { return t.name === 'Sandbox'; });
       var isLocal = base.indexOf('localhost') !== -1 && location.hostname !== 'localhost';
       if (!hasSandbox || isLocal) {
-        $('start').style.display = 'none';
+        $('startBtn').style.display = 'none';
         $('session').style.display = 'none';
         $('local').style.display = '';
       }
